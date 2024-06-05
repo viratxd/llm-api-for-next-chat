@@ -1,0 +1,74 @@
+services:
+  llm-api-for-next-chat:
+    build: .
+    image: llm-api-for-next-chat/llm-api-for-next-chat:latest
+    container_name: llm-api-for-next-chat
+    ports:
+      - 5000:5000
+    restart: unless-stopped
+    volumes:
+      - ./theb_ai/Theb_API.json:/app/theb_ai/Theb_API.json
+      - .env:/app/.env
+    networks:
+      - llms_api
+
+  chatgpt-next-web:
+    image: yidadaa/chatgpt-next-web:latest
+    container_name: chatgpt-next-web
+    restart: unless-stopped
+    depends_on:
+      - llm-api-for-next-chat
+    ports:
+      - 3030:3000
+    environment:
+      BASE_URL: http:/llm-api-for-next-chat:5000/api/openai
+      ANTHROPIC_URL: http://llm-api-for-next-chat:5000/api/anthropic
+      CUSTOM_MODELS:
+        "-all,\
+        gpt-4o,\
+        gpt-4-turbo,\
+        gpt-4,\
+        gpt-3.5-turbo,\
+        gemini-1.5-pro-latest,\
+        gemini-1.5-flash-latest,\
+        gemini-pro,\
+        gemini-pro-vision,\
+        claude-3-opus-20240229,\
+        claude-3-sonnet-20240229,\
+        claude-3-haiku-20240307,\
+        llama-3-70b,\
+        llama-3-70b-instruct,\
+        llama-3-8b,\
+        code-llama-70b,\
+        code-llama-34b,\
+        code-llama-13b,\
+        code-llama-7b,\
+        mixtral-8x22b,\
+        mixtral-8x7b,\
+        mixtral-8x7b-instruct,\
+        mixtral-7b,\
+        mistral-7b-instruct,\
+        wizardlm-2-8x22b,\
+        dbrx-instruct,\
+        qwen1.5-110b,\
+        qwen1.5-72b,\
+        qwen1.5-32b,\
+        qwen1.5-14b,\
+        qwen1.5-7b,\
+        yi-1.5-34b-chat,\
+        yi-34b,\
+        theb-ai,\
+        command-r-plus,\
+        zephry-141b-a35b,\
+        nous-hermes-2-mixtral-8x7b-dpo,\
+        gemma-1.1-7b-instruct,\
+        phi-3-mini-4k-instruct"
+    env_file:
+      - .env
+    networks:
+      - llms_api
+
+
+networks:
+  llms_api:
+    name: llms_api

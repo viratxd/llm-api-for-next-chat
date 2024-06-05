@@ -1,0 +1,8 @@
+requests
+selenium
+webdriver-manager
+webscout
+tls-client
+fastapi
+pillow
+python-dotenv

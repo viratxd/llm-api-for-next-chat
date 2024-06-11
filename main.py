@@ -233,10 +233,10 @@ async def openai_chat_completions(
                             )
                             accumulated_response_text = data.token
                         case "file":
-                            # download image to tmp folder and return markdown image
+                            # download image to generated_images folder and return markdown image
                             image = await hf_api.generate_image(data.sha)
                             extension = data.mime.split("/")[1]
-                            image_file = Path(f"tmp/{data.sha}.{extension}")
+                            image_file = Path(f"generated_images/{data.sha}.{extension}")
                             image_file.parent.mkdir(parents=True, exist_ok=True)
                             image_file.write_bytes(await image.aread())
                             image_url = f"{API_HOST}/static/{data.sha}.{extension}"

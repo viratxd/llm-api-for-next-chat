@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./theb_ai/Theb_API.json:/app/theb_ai/Theb_API.json
+      - ./generated_images:/app/generated_images
       - .env:/app/.env
     networks:
       - llms_api

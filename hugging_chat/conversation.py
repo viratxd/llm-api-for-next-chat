@@ -1,6 +1,12 @@
-from fastapi import HTTPException
+import json
+import random
+import string
 import httpx
 import os
+from fastapi import HTTPException
+from urllib3 import encode_multipart_formdata
+from urllib3.fields import RequestField
+from utility import get_user_agent
 
 
 model_key_mapping = {
@@ -17,7 +23,8 @@ model_key_mapping = {
 
 
 class HuggingChat_RE:
-    hugging_face_chat_conversation_url = "https://huggingface.co/chat/conversation"
+    hugging_face_url = "https://huggingface.co"
+    chat_conversation_url = f"{hugging_face_url}/chat/conversation"
 
     def __init__(
         self, model: str = "command-r-plus", system_prompt: str = "", async_client: httpx.AsyncClient = None
@@ -39,6 +46,8 @@ class HuggingChat_RE:
         self.system_prompt = system_prompt
         self.headers = {
             "Cookie": f"hf-chat={self.hf_chat}",
+            "User-Agent": get_user_agent(),
+            "Origin": "https://huggingface.co",
         }
         self.async_client = async_client or httpx.AsyncClient()
         self.conversationId = None
@@ -68,9 +77,7 @@ class HuggingChat_RE:
         - str: The conversation ID retrieved from the server response.
         """
         payload = {"model": self.model, "preprompt": self.system_prompt}
-        response = await self.async_client.post(
-            self.hugging_face_chat_conversation_url, json=payload, headers=self.headers
-        )
+        response = await self.async_client.post(self.chat_conversation_url, json=payload, headers=self.headers)
         response.raise_for_status()
         response_json = response.json()
         print("\033[92m" + "Initialised Conversation ID:", response_json["conversationId"] + "\033[0m")
@@ -83,7 +90,7 @@ class HuggingChat_RE:
         Returns:
         - str: The message ID retrieved from the server response.
         """
-        url = f"{self.hugging_face_chat_conversation_url}/{self.conversationId}/__data.json?x-sveltekit-invalidated=11"
+        url = f"{self.chat_conversation_url}/{self.conversationId}/__data.json?x-sveltekit-invalidated=11"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
         response_json = response.json()
@@ -93,36 +100,48 @@ class HuggingChat_RE:
     async def generate_image(self, sha: str):
         if not self.conversationId:
             await self.init_conversation()
-        url = f"{self.hugging_face_chat_conversation_url}/{self.conversationId}/output/{sha}"
+        url = f"{self.chat_conversation_url}/{self.conversationId}/output/{sha}"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
         return response
 
-    async def request_conversation(self, query: str, web_search: bool = False, files=[]):
+    async def request_conversation(self, query: str, web_search: bool = False):
         if not self.hf_chat:
             raise HTTPException(status_code=400, detail="Please set the HUGGING_CHAT_ID environment variable.")
 
         if not self.conversationId or not self.messageId:
             await self.init_conversation()
 
-        url = f"{self.hugging_face_chat_conversation_url}/{self.conversationId}"
-        payload = {
-            "inputs": query,
-            "id": self.messageId,
-            "is_retry": False,
-            "is_continue": False,
-            "web_search": web_search,
-            "files": files,
-            "tools": {
-                "websearch": False,
-                "fetch_url": True,
-                "document_parser": True,
-                "query_calculator": False,
-                "image_editing": True,
-                "image_generation": True,
-            },
-        }
-        req = self.async_client.build_request("POST", url, json=payload, headers=self.headers, timeout=None)
+        url = f"{self.chat_conversation_url}/{self.conversationId}"
+
+        request_fields = [
+            RequestField(
+                name="data",
+                data=json.dumps(
+                    {
+                        "inputs": query,
+                        "id": self.messageId,
+                        "is_retry": False,
+                        "is_continue": False,
+                        "web_search": web_search,
+                        "tools": {
+                            "websearch": False,
+                            "fetch_url": True,
+                            "document_parser": True,
+                            "query_calculator": False,
+                            "image_editing": True,
+                            "image_generation": True,
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                headers={"Content-Disposition": 'form-data; name="data"'},
+            ),
+        ]
+        random_boundary = f"----WebKitFormBoundary{''.join(random.sample(string.ascii_letters + string.digits, 16))}"
+        content, content_type = encode_multipart_formdata(request_fields, boundary=random_boundary)
+        headers = self.headers | {"Content-Type": content_type}
+        req = self.async_client.build_request("POST", url, content=content, headers=headers, timeout=None)
         response = await self.async_client.send(req, stream=True)
         print("Hugging Chat Response Status Code:", response.status_code)
         return response

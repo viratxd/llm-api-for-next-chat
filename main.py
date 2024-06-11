@@ -239,7 +239,7 @@ async def openai_chat_completions(
                             image_file = Path(f"generated_images/{data.sha}.{extension}")
                             image_file.parent.mkdir(parents=True, exist_ok=True)
                             image_file.write_bytes(await image.aread())
-                            image_url = f"{API_HOST}/static/{data.sha}.{extension}"
+                            image_url = f"{API_HOST}/image/{data.sha}.{extension}"
                             markdown_image = f"![{data.name}]({image_url})"
 
                             openai_data.choices = [
@@ -292,6 +292,6 @@ async def openai_chat_completions(
         )
 
 
-@app.get("/static/{file_name}")
-def static(file_name: str):
-    return FileResponse(f"tmp/{file_name}")
+@app.get("/image/{file_name}")
+def image(file_name: str):
+    return FileResponse(f"generated_images/{file_name}")

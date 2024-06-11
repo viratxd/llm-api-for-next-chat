@@ -1,15 +1,15 @@
-import base64
 import uuid
-from fastapi.encoders import jsonable_encoder
 import httpx
 import asyncio
 import json
 import re
 import os
 import time
+from pathlib import Path
 from pydantic import ValidationError
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,6 +28,8 @@ from schemas import (
 )
 from theb_ai.conversation import load_api_info, theb_ai_conversation, model_key_mapping as theb_ai_supported_models
 from hugging_chat.conversation import HuggingChat_RE, model_key_mapping as hugging_chat_supported_models
+
+API_HOST = os.environ.get("API_HOST", "http://localhost:5000")
 
 
 class LoadEnvMiddleware(BaseHTTPMiddleware):
@@ -196,6 +198,9 @@ async def openai_chat_completions(
             )
             response = await hf_api.request_conversation(query)
 
+            if response.status_code != 200:
+                return HTTPException(status_code=response.status_code, detail=response.read())
+
             async def content_generator():
                 openai_data = OpenAiData(
                     choices=[Choices(delta=Message(role="assistant", content=""), index=0, finish_reason=None)],
@@ -210,7 +215,11 @@ async def openai_chat_completions(
 
                 accumulated_response_text = ""
                 async for line in response.aiter_lines():
-                    data = HuggingChatData(**json.loads(line))
+                    try:
+                        data = HuggingChatData(**json.loads(line))
+                    except (json.JSONDecodeError, ValidationError):
+                        print(f"Erorr parsing response: {response}")
+                        raise HTTPException(status_code=400, detail="Error parsing response")
                     match data.type:
                         case "stream":
                             text_delta = data.token.replace(accumulated_response_text, "").replace("\u0000", "")
@@ -224,10 +233,15 @@ async def openai_chat_completions(
                             )
                             accumulated_response_text = data.token
                         case "file":
-                            # convert image to base64 with markdown format
+                            # download image to tmp folder and return markdown image
                             image = await hf_api.generate_image(data.sha)
-                            image_base64 = base64.b64encode(image.content).decode("utf-8")
-                            markdown_image = f"![{data.name}](data:{data.mime};base64,{image_base64})"
+                            extension = data.mime.split("/")[1]
+                            image_file = Path(f"tmp/{data.sha}.{extension}")
+                            image_file.parent.mkdir(parents=True, exist_ok=True)
+                            image_file.write_bytes(await image.aread())
+                            image_url = f"{API_HOST}/static/{data.sha}.{extension}"
+                            markdown_image = f"![{data.name}]({image_url})"
+
                             openai_data.choices = [
                                 Choices(delta=Message(content=markdown_image), index=0, finish_reason=None)
                             ]
@@ -276,3 +290,8 @@ async def openai_chat_completions(
                 headers=response_headers,
             )
         )
+
+
+@app.get("/static/{file_name}")
+def static(file_name: str):
+    return FileResponse(f"tmp/{file_name}")

@@ -61,6 +61,8 @@ docstring-inheritance==2.2.0
     # via webscout
 email-validator==2.1.1
     # via fastapi
+fake-useragent==1.5.1
+    # via -r requirements.in
 fastapi==0.111.0
     # via -r requirements.in
 fastapi-cli==0.0.4

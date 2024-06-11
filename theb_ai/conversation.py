@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from .Theb_AI_Login import Theb_API_JSON_PATH, start_async_tasks as generate_api_token
 from schemas import MessageJsonData
-
+from utility import get_user_agent
 
 # Mapping of model identifiers to their respective keys
 model_key_mapping = {
@@ -79,9 +79,7 @@ async def theb_ai_conversation(message_json_data: MessageJsonData, async_client:
             "long_term_memory": "ltm",
         },
     }
-    req_headers = {
-        "Authorization": f"Bearer {api_key}",
-    }
+    req_headers = {"Authorization": f"Bearer {api_key}", "User-Agent": get_user_agent()}
 
     json_payload = json.dumps(request_payload, ensure_ascii=False)
     req = async_client.build_request("POST", api_endpoint, headers=req_headers, data=json_payload, timeout=None)

@@ -17,6 +17,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from webscout import tempid
+from utility import get_user_agent
 
 
 Theb_API_JSON_PATH = "theb_ai/Theb_API.json"
@@ -61,7 +62,7 @@ async def register_user(email, fullname="DevsDoCode", password="DevsDoCode@07"):
         "password": password,
     }
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": get_user_agent(),
         "X-Cf-Turnstile-Token": "",
     }
     response = requests.post(url, json=payload, headers=headers)
@@ -122,7 +123,7 @@ async def get_api_token(email, fullname="DevsDoCode", password="DevsDoCode@07"):
     url = "https://beta.theb.ai/api/token"
     payload = {"username": email.email, "password": password}
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": get_user_agent(),
         "X-Client-Language": "en",
     }
     response = requests.post(url, data=payload, headers=headers)
@@ -143,7 +144,7 @@ async def get_organization_id(access_token):
     url = "https://beta.theb.ai/api/me"
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": get_user_agent(),
         "X-Client-Language": "en",
     }
 

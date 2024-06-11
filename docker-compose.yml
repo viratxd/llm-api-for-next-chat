@@ -21,7 +21,7 @@ services:
     ports:
       - 3030:3000
     environment:
-      BASE_URL: http:/llm-api-for-next-chat:5000/api/openai
+      BASE_URL: http://llm-api-for-next-chat:5000/api/openai
       ANTHROPIC_URL: http://llm-api-for-next-chat:5000/api/anthropic
       CUSTOM_MODELS:
         "-all,\

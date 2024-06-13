@@ -125,11 +125,11 @@ class HuggingChat_RE:
                         "is_continue": False,
                         "web_search": web_search,
                         "tools": {
-                            "websearch": False,
+                            "websearch": web_search,
                             "fetch_url": True,
                             "document_parser": True,
                             "query_calculator": False,
-                            "image_editing": True,
+                            "image_editing": False,
                             "image_generation": True,
                         },
                     },

@@ -5,6 +5,7 @@ import json
 import re
 import os
 import time
+from distutils.util import strtobool
 from pathlib import Path
 from pydantic import ValidationError
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException, Request
@@ -12,7 +13,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 from schemas import (
     MessageJsonData,
@@ -28,25 +28,9 @@ from schemas import (
 )
 from theb_ai.conversation import load_api_info, theb_ai_conversation, model_key_mapping as theb_ai_supported_models
 from hugging_chat.conversation import HuggingChat_RE, model_key_mapping as hugging_chat_supported_models
+from utility import get_response_headers
 
 API_HOST = os.environ.get("API_HOST", "http://localhost:5000")
-
-
-class LoadEnvMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        load_dotenv(override=True)
-        response = await call_next(request)
-        return response
-
-
-def get_response_headers(stream: bool):
-    return {
-        "Transfer-Encoding": "chunked",
-        "X-Accel-Buffering": "no",
-        "Content-Type": ("text/event-stream;" if stream else "application/json;" + " charset=utf-8"),
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-    }
 
 
 @asynccontextmanager
@@ -67,7 +51,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(LoadEnvMiddleware)
+
+@app.middleware("http")
+async def load_env_middleware(request: Request, call_next):
+    load_dotenv(override=True)
+    response = await call_next(request)
+    return response
 
 
 @app.post("/api/anthropic/v1/messages")
@@ -85,9 +74,7 @@ async def anthropic_messages(message_json_data: MessageJsonData, background_task
                     line_content = re.sub("^data: ", "", line)
                     try:
                         data = TheB_Data(**json.loads(line_content))
-                    except json.JSONDecodeError:
-                        continue
-                    except ValidationError:
+                    except (json.JSONDecodeError, ValidationError):
                         continue
                     text_delta = data.args.content.replace(accumulated_response_text, "")
                     yield (
@@ -196,10 +183,12 @@ async def openai_chat_completions(
             query = json.dumps(
                 [jsonable_encoder(message) for message in message_json_data.messages], ensure_ascii=False
             )
-            response = await hf_api.request_conversation(query)
+            response = await hf_api.request_conversation(
+                query, web_search=bool(strtobool(os.environ.get("HUGGING_CHAT_ALLOW_WEB_SEARCH", "0")))
+            )
 
             if response.status_code != 200:
-                return HTTPException(status_code=response.status_code, detail=response.read())
+                return JSONResponse(json.loads(await response.aread()), status_code=response.status_code)
 
             async def content_generator():
                 openai_data = OpenAiData(

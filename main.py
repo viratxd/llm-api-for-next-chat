@@ -26,8 +26,8 @@ from schemas import (
     Content,
     ChunkJson,
 )
-from theb_ai.conversation import load_api_info, theb_ai_conversation, model_key_mapping as theb_ai_supported_models
-from hugging_chat.conversation import HuggingChat_RE, model_key_mapping as hugging_chat_supported_models
+from theb_ai.conversation import TheB_AI_RE
+from hugging_chat.conversation import HuggingChat_RE
 from utility import get_response_headers
 
 API_HOST = os.environ.get("API_HOST", "http://localhost:5000")
@@ -35,8 +35,8 @@ API_HOST = os.environ.get("API_HOST", "http://localhost:5000")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_api_info()
     app.async_client = httpx.AsyncClient()
+    app.theb_ai = TheB_AI_RE(app.async_client)
     yield
     await app.async_client.aclose()
 
@@ -61,7 +61,7 @@ async def load_env_middleware(request: Request, call_next):
 
 @app.post("/api/anthropic/v1/messages")
 async def anthropic_messages(message_json_data: MessageJsonData, background_tasks: BackgroundTasks):
-    response = await theb_ai_conversation(message_json_data, app.async_client)
+    response = await app.theb_ai.conversation(message_json_data)
     background_tasks.add_task(response.aclose)
     lock = asyncio.Lock()
 
@@ -132,8 +132,8 @@ async def openai_chat_completions(
             top_p=comletions_json_data.top_p,
         )
 
-        if message_json_data.model in theb_ai_supported_models:
-            response = await theb_ai_conversation(message_json_data, async_client)
+        if message_json_data.model in app.theb_ai.model_key_mapping.values():
+            response = await app.theb_ai.conversation(message_json_data)
             lock = asyncio.Lock()
 
             async def content_generator():
@@ -178,7 +178,7 @@ async def openai_chat_completions(
                             )
                             break
 
-        elif message_json_data.model in hugging_chat_supported_models:
+        elif message_json_data.model in HuggingChat_RE.model_key_mapping:
             hf_api = HuggingChat_RE(model=message_json_data.model, async_client=async_client)
             query = json.dumps(
                 [jsonable_encoder(message) for message in message_json_data.messages], ensure_ascii=False

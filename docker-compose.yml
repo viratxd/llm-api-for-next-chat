@@ -40,10 +40,10 @@ services:
         llama-3-70b,\
         llama-3-70b-instruct,\
         llama-3-8b,\
-        code-llama-70b,\
-        code-llama-34b,\
-        code-llama-13b,\
-        code-llama-7b,\
+        codellama-70b,\
+        codellama-34b,\
+        codellama-13b,\
+        codellama-7b,\
         mixtral-8x22b,\
         mixtral-8x7b,\
         mixtral-8x7b-instruct,\

@@ -3,9 +3,7 @@ import httpx
 import asyncio
 import json
 import re
-import os
 import time
-from distutils.util import strtobool
 from pathlib import Path
 from pydantic import ValidationError
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException, Request
@@ -13,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
+from environs import Env
 from schemas import (
     MessageJsonData,
     CompletionsJsonData,
@@ -28,17 +26,24 @@ from schemas import (
 )
 from theb_ai.conversation import TheB_AI_RE
 from hugging_chat.conversation import HuggingChat_RE
-from utility import get_response_headers
+from chatgpt_web.conversation import ChatGPT_Web_RE
+from utility import color_print, get_openai_chunk_response, get_openai_chunk_response_end, get_response_headers
 
-API_HOST = os.environ.get("API_HOST", "http://localhost:5000")
+env = Env()
+env.read_env()
+
+API_HOST = env("API_HOST", "http://localhost:5000")
+
+async_client = httpx.AsyncClient()
+theb_ai = TheB_AI_RE(async_client)
+hf_chat = HuggingChat_RE(async_client)
+chatgpt_web = ChatGPT_Web_RE()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.async_client = httpx.AsyncClient()
-    app.theb_ai = TheB_AI_RE(app.async_client)
     yield
-    await app.async_client.aclose()
+    await async_client.aclose()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -54,14 +59,19 @@ app.add_middleware(
 
 @app.middleware("http")
 async def load_env_middleware(request: Request, call_next):
-    load_dotenv(override=True)
+    env.read_env(override=True)
     response = await call_next(request)
     return response
 
 
 @app.post("/api/anthropic/v1/messages")
 async def anthropic_messages(message_json_data: MessageJsonData, background_tasks: BackgroundTasks):
-    response = await app.theb_ai.conversation(message_json_data)
+    messages_str = json.dumps(
+        [jsonable_encoder(message, exclude_unset=True) for message in message_json_data.messages], ensure_ascii=False
+    )
+    response = await theb_ai.conversation(
+        message_json_data.model, messages_str, message_json_data.temperature, message_json_data.top_p
+    )
     background_tasks.add_task(response.aclose)
     lock = asyncio.Lock()
 
@@ -103,182 +113,165 @@ async def anthropic_messages(message_json_data: MessageJsonData, background_task
 async def openai_chat_completions(
     comletions_json_data: CompletionsJsonData, background_tasks: BackgroundTasks, authorization: str = Header("")
 ):
-    async_client = app.async_client
-    response_headers = get_response_headers(comletions_json_data.stream)
+    model = comletions_json_data.model
+    stream = comletions_json_data.stream
+    response_headers = get_response_headers(stream)
+    messages_str = json.dumps(
+        [jsonable_encoder(message, exclude_unset=True) for message in comletions_json_data.messages], ensure_ascii=False
+    )
 
-    # reverse to openai completions
-    if comletions_json_data.model.startswith("gpt"):
-        openai_api = os.environ.get("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
-        req = async_client.build_request(
-            "POST",
-            openai_api,
-            headers={"Authorization": authorization},
-            data=comletions_json_data.model_dump_json(),
-            timeout=None,
-        )
-        resp = await async_client.send(req, stream=True)
-        background_tasks.add_task(resp.aclose)
-        return StreamingResponse(resp.aiter_raw(), status_code=resp.status_code, headers=response_headers)
-    # imitate to openai completions response
-    else:
-        # openai completions to claude message
-        message_json_data = MessageJsonData(
-            max_tokens=4000,
-            messages=comletions_json_data.messages,
-            model=comletions_json_data.model,
-            stream=comletions_json_data.stream,
-            temperature=comletions_json_data.temperature,
-            top_k=5,
-            top_p=comletions_json_data.top_p,
-        )
-
-        if message_json_data.model in app.theb_ai.model_key_mapping.values():
-            response = await app.theb_ai.conversation(message_json_data)
-            lock = asyncio.Lock()
-
-            async def content_generator():
-                async with lock:
-                    openai_data = OpenAiData(
-                        choices=[Choices(delta=Message(role="assistant", content=""), index=0, finish_reason=None)],
-                        created=int(time.time()),
-                        id=f"chatcmpl-{uuid.uuid4().hex[:29]}",
-                        object="chat.completion.chunk",
-                        model=message_json_data.model,
-                    )
-                    yield (
-                        f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
-                        if message_json_data.stream
-                        else ""
-                    )
-
-                    accumulated_response_text = ""
-                    async for line in response.aiter_lines():
-                        if line and not line.startswith("event: "):
-                            line_content = re.sub("^data: ", "", line)
-                            try:
-                                data = TheB_Data(**json.loads(line_content))
-                            except (json.JSONDecodeError, ValidationError):
-                                continue
-                            text_delta = data.args.content.replace(accumulated_response_text, "")
-                            openai_data.choices = [
-                                Choices(delta=Message(content=text_delta), index=0, finish_reason=None)
-                            ]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
-                                if message_json_data.stream
-                                else text_delta
-                            )
-                            accumulated_response_text = data.args.content
-                        if line == "event: end":
-                            openai_data.choices = [Choices(delta=Message(content=""), index=0, finish_reason="stop")]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\ndata: [DONE]\n\n"
-                                if message_json_data.stream
-                                else ""
-                            )
-                            break
-
-        elif message_json_data.model in HuggingChat_RE.model_key_mapping:
-            hf_api = HuggingChat_RE(model=message_json_data.model, async_client=async_client)
-            query = json.dumps(
-                [jsonable_encoder(message) for message in message_json_data.messages], ensure_ascii=False
+    if model.startswith("gpt"):
+        if not env.bool("USE_CHATGPT_WEB", True):
+            # reverse to openai completions
+            openai_api = env("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
+            req = async_client.build_request(
+                "POST",
+                openai_api,
+                headers={"Authorization": authorization},
+                json=comletions_json_data.model_dump(),
+                timeout=None,
             )
-            response = await hf_api.request_conversation(
-                query, web_search=bool(strtobool(os.environ.get("HUGGING_CHAT_ALLOW_WEB_SEARCH", "0")))
-            )
+            resp = await async_client.send(req, stream=True)
+            background_tasks.add_task(resp.aclose)
+            return StreamingResponse(resp.aiter_raw(), status_code=resp.status_code, headers=response_headers)
+        else:
+            response = await chatgpt_web.conversation(model, messages_str)
 
-            if response.status_code != 200:
-                return JSONResponse(json.loads(await response.aread()), status_code=response.status_code)
-
+            # imitate to openai completions response
             async def content_generator():
-                openai_data = OpenAiData(
-                    choices=[Choices(delta=Message(role="assistant", content=""), index=0, finish_reason=None)],
-                    created=int(time.time()),
-                    id=f"chatcmpl-{uuid.uuid4().hex[:29]}",
-                    object="chat.completion.chunk",
-                    model=message_json_data.model,
-                )
-                yield (
-                    f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if message_json_data.stream else ""
-                )
+                openai_data = get_openai_chunk_response(model)
+                yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else "")
 
                 accumulated_response_text = ""
                 async for line in response.aiter_lines():
-                    try:
-                        data = HuggingChatData(**json.loads(line))
-                    except (json.JSONDecodeError, ValidationError):
-                        print(f"Erorr parsing response: {response}")
-                        raise HTTPException(status_code=400, detail="Error parsing response")
-                    match data.type:
-                        case "stream":
-                            text_delta = data.token.replace(accumulated_response_text, "").replace("\u0000", "")
-                            openai_data.choices = [
-                                Choices(delta=Message(content=text_delta), index=0, finish_reason=None)
-                            ]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
-                                if message_json_data.stream
-                                else text_delta
-                            )
-                            accumulated_response_text = data.token
-                        case "file":
-                            # download image to generated_images folder and return markdown image
-                            image = await hf_api.generate_image(data.sha)
-                            extension = data.mime.split("/")[1]
-                            image_file = Path(f"generated_images/{data.sha}.{extension}")
-                            image_file.parent.mkdir(parents=True, exist_ok=True)
-                            image_file.write_bytes(await image.aread())
-                            image_url = f"{API_HOST}/image/{data.sha}.{extension}"
-                            markdown_image = f"![{data.name}]({image_url})"
-
-                            openai_data.choices = [
-                                Choices(delta=Message(content=markdown_image), index=0, finish_reason=None)
-                            ]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
-                                if message_json_data.stream
-                                else markdown_image
-                            )
-                        case "finalAnswer":
-                            openai_data.choices = [Choices(delta=Message(content=""), index=0, finish_reason="stop")]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\ndata: [DONE]\n\n"
-                                if message_json_data.stream
-                                else ""
-                            )
+                    if line:
+                        line_content = re.sub("^data: ", "", line.decode("utf-8"))
+                        if line_content == "[DONE]":
+                            yield get_openai_chunk_response_end(model, stream)
                             break
-                        case _:
-                            print(f"Unparsed line: {line}")
 
-        else:
-            raise HTTPException(status_code=400, detail="Model not supported")
+                        try:
+                            json_content = json.loads(line_content)
 
-        background_tasks.add_task(response.aclose)
-        return (
-            StreamingResponse(content_generator(), headers=response_headers)
-            if message_json_data.stream
-            # for summarize
-            else JSONResponse(
-                OpenAiData(
-                    choices=[
-                        Choices(
-                            message=Message(
-                                role="assistant",
-                                content="".join([text_delta async for text_delta in content_generator()]),
-                            ),
-                            index=0,
-                            finish_reason="stop",
-                        )
-                    ],
-                    created=int(time.time()),
-                    id=f"chatcmpl-{uuid.uuid4().hex[:29]}",
-                    object="chat.completion",
-                    model=message_json_data.model,
-                    usage=Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
-                ).model_dump(exclude_unset=True),
-                headers=response_headers,
-            )
+                            # sometimes the response status is 200 but still contains error message
+                            if "error" in json_content and json_content["error"]:
+                                color_print(f"200 response with error: {json_content['error']}", "yellow")
+                                openai_data.choices = [Choices(delta=Message(content=json_content["error"]))]
+                                yield f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
+                                break
+
+                            message = json_content["message"]
+                            message = Message(**message)
+                        except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
+                            color_print(f"Not supported line: {line_content}", "yellow")
+                            continue
+                        if message.author.role == "assistant":
+                            text_delta = message.content.parts[0].replace(accumulated_response_text, "")
+                            openai_data.choices = [Choices(delta=Message(content=text_delta))]
+                            yield (
+                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta
+                            )
+                            accumulated_response_text = message.content.parts[0]
+
+    # imitate to openai completions response
+    elif model in theb_ai.model_key_mapping.values():
+        response = await theb_ai.conversation(
+            model, messages_str, comletions_json_data.temperature, comletions_json_data.top_p
         )
+        lock = asyncio.Lock()
+
+        async def content_generator():
+            async with lock:
+                openai_data = get_openai_chunk_response(model)
+                yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else "")
+
+                accumulated_response_text = ""
+                async for line in response.aiter_lines():
+                    if line and not line.startswith("event: "):
+                        line_content = re.sub("^data: ", "", line)
+                        try:
+                            data = TheB_Data(**json.loads(line_content))
+                        except (json.JSONDecodeError, ValidationError):
+                            continue
+                        text_delta = data.args.content.replace(accumulated_response_text, "")
+                        openai_data.choices = [Choices(delta=Message(content=text_delta))]
+                        yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta)
+                        accumulated_response_text = data.args.content
+                    if line == "event: end":
+                        yield get_openai_chunk_response_end(model, stream)
+                        break
+
+    elif model in hf_chat.model_key_mapping:
+        response = await hf_chat.request_conversation(messages_str)
+
+        if response.status_code != 200:
+            return JSONResponse(json.loads(await response.aread()), status_code=response.status_code)
+
+        async def content_generator():
+            openai_data = openai_data = get_openai_chunk_response(model)
+            yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else "")
+
+            accumulated_response_text = ""
+            async for line in response.aiter_lines():
+                try:
+                    data = HuggingChatData(**json.loads(line))
+                except (json.JSONDecodeError, ValidationError):
+                    color_print(f"Erorr parsing response: {line}", "red")
+                    raise HTTPException(status_code=400, detail="Error parsing response")
+                match data.type:
+                    case "stream":
+                        text_delta = data.token.replace(accumulated_response_text, "").replace("\u0000", "")
+                        openai_data.choices = [Choices(delta=Message(content=text_delta))]
+                        yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta)
+                        accumulated_response_text = data.token
+                    case "file":
+                        # download image to generated_images folder and return markdown image
+                        image = await hf_chat.generate_image(data.sha)
+                        extension = data.mime.split("/")[1]
+                        image_file = Path(f"generated_images/{data.sha}.{extension}")
+                        image_file.parent.mkdir(parents=True, exist_ok=True)
+                        image_file.write_bytes(await image.aread())
+                        image_url = f"{API_HOST}/image/{data.sha}.{extension}"
+                        markdown_image = f"![{data.name}]({image_url})"
+
+                        openai_data.choices = [Choices(delta=Message(content=markdown_image))]
+                        yield (
+                            f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else markdown_image
+                        )
+                    case "finalAnswer":
+                        yield get_openai_chunk_response_end(model, stream)
+                        break
+                    case _:
+                        color_print(f"Unparsed line: {line}", "yellow")
+
+    else:
+        raise HTTPException(status_code=400, detail="Model not supported")
+
+    background_tasks.add_task(response.aclose)
+    return (
+        StreamingResponse(content_generator(), headers=response_headers)
+        if stream
+        # for summarize
+        else JSONResponse(
+            OpenAiData(
+                choices=[
+                    Choices(
+                        message=Message(
+                            role="assistant",
+                            content="".join([text_delta async for text_delta in content_generator()]),
+                        ),
+                        finish_reason="stop",
+                    )
+                ],
+                created=int(time.time()),
+                id=f"chatcmpl-{uuid.uuid4().hex[:29]}",
+                object="chat.completion",
+                model=model,
+                usage=Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            ).model_dump(exclude_unset=True),
+            headers=response_headers,
+        )
+    )
 
 
 @app.get("/image/{file_name}")

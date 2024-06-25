@@ -6,4 +6,4 @@ webscout
 tls-client
 fastapi
 pillow
-python-dotenv
+environs

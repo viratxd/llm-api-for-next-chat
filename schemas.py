@@ -34,9 +34,21 @@ class Content(BaseModel):
     type: str
 
 
+class Author(BaseModel):
+    role: str
+    name: Optional[str] = None
+    metadata: dict = {}
+
+
+class ChatGPT_Web_Content(BaseModel):
+    content_type: str = "text"
+    parts: list[str]
+
+
 class Message(BaseModel):
     role: str = None
-    content: str | list[Content]
+    content: str | list[Content] | ChatGPT_Web_Content
+    author: Optional[Author] = None
 
 
 class MessageJsonData(BaseModel):
@@ -82,8 +94,8 @@ class HuggingChatData(BaseModel):
 class Choices(BaseModel):
     delta: Message = None
     message: Message = None
-    index: int
-    finish_reason: Optional[str]
+    index: int = 0
+    finish_reason: Optional[str] = None
 
 
 class Usage(BaseModel):

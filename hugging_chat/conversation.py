@@ -6,7 +6,7 @@ import os
 from fastapi import HTTPException
 from urllib3 import encode_multipart_formdata
 from urllib3.fields import RequestField
-from utility import get_user_agent
+from utility import color_print, get_user_agent
 
 
 class HuggingChat_RE:
@@ -27,19 +27,6 @@ class HuggingChat_RE:
     def __init__(
         self, model: str = "command-r-plus", system_prompt: str = "", async_client: httpx.AsyncClient = None
     ) -> None:
-        """
-        Initializes an instance of the HuggingChat_RE class.
-
-        Parameters:
-        - hf_chat (str): The Hugging Face chat token.
-        - model (str): The name or path of the model to be used for the chat. Defaults to "command-r-plus".
-        - system_prompt (str): The system prompt to be used for the chat. Defaults to "Be Helpful and Friendly".
-        - async_client (httpx.AsyncClient): An async client to be used for making HTTP requests. Defaults to None.
-
-        Returns:
-        - None: This is a constructor method and does not return anything.
-        """
-        self.hf_chat = os.environ.get("HUGGING_CHAT_ID")
         self.model = self.model_key_mapping.get(model, "CohereForAI/c4ai-command-r-plus")
         self.system_prompt = system_prompt
         self.headers = {
@@ -51,6 +38,20 @@ class HuggingChat_RE:
         self.conversationId = None
         self.messageId = None
 
+    @property
+    def hf_chat(self) -> str:
+        return os.environ.get("HUGGING_CHAT_TOKEN")
+
+    @staticmethod
+    def generate_random_boundary() -> str:
+        return f"----WebKitFormBoundary{''.join(random.sample(string.ascii_letters + string.digits, 16))}"
+
+    @property
+    def config(self) -> dict:
+        with open("hugging_chat/config.json", "r") as config_file:
+            config = json.load(config_file)
+        return config
+
     async def _init_conversation(self):
         max_retries = 3
         retries = 0
@@ -61,39 +62,37 @@ class HuggingChat_RE:
                 self.messageId = await self._find_message_id()
                 break
             except httpx.ReadTimeout:
-                print("\033[91m" + "ReadTimeout Error: Retrying..." + "\033[0m")
+                color_print("ReadTimeout Error: Retrying...", "yellow")
                 retries += 1
         if retries == max_retries:
-            print("\033[91m" + "Max retries exceeded. Unable to initialize conversation." + "\033[0m")
+            color_print("Max retries exceeded. Unable to initialize conversation.", "red")
             raise HTTPException(status_code=500, detail="Unable to initialize conversation.")
 
     async def _find_conversation_id(self) -> str:
-        """
-        Finds and returns the conversation ID for the Hugging Face chat.
-
-        Returns:
-        - str: The conversation ID retrieved from the server response.
-        """
         payload = {"model": self.model, "preprompt": self.system_prompt}
         response = await self.async_client.post(self.chat_conversation_url, json=payload, headers=self.headers)
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid Hugging Face chat token.")
         response.raise_for_status()
         response_json = response.json()
-        print("\033[92m" + "Initialised Conversation ID:", response_json["conversationId"] + "\033[0m")
+        color_print(f"Initialised Conversation ID: {response_json['conversationId']}", "green")
         return response_json["conversationId"]
 
     async def _find_message_id(self) -> str:
-        """
-        Finds and returns the message ID for the Hugging Face chat.
-
-        Returns:
-        - str: The message ID retrieved from the server response.
-        """
         url = f"{self.chat_conversation_url}/{self.conversationId}/__data.json?x-sveltekit-invalidated=11"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
         response_json = response.json()
-        print("\033[92m" + "Initialised Message ID:", response_json["nodes"][1]["data"][3] + "\033[0m")
-        return response_json["nodes"][1]["data"][3]
+        message_id = response_json["nodes"][1]["data"][3]
+        color_print(f"Initialised Message ID: {message_id}", "green")
+        return message_id
+
+    async def _delete_all_conversation(self) -> None:
+        delete_url = f"{self.chat_conversation_url}s?/delete"
+        headers = self.headers | {"Content-Type": f"multipart/form-data; boundary={self.generate_random_boundary()}"}
+        response = await self.async_client.post(delete_url, headers=headers)
+        response.raise_for_status()
+        color_print("All conversation deleted.", "green")
 
     async def generate_image(self, sha: str):
         if not self.conversationId:
@@ -103,15 +102,15 @@ class HuggingChat_RE:
         response.raise_for_status()
         return response
 
-    async def request_conversation(self, query: str, web_search: bool = False):
+    async def request_conversation(self, query: str):
         if not self.hf_chat:
-            raise HTTPException(status_code=400, detail="Please set the HUGGING_CHAT_ID environment variable.")
+            raise HTTPException(status_code=400, detail="Please set the HUGGING_CHAT_TOKEN environment variable.")
 
-        if not self.conversationId or not self.messageId:
-            await self._init_conversation()
+        await self._init_conversation()
 
         url = f"{self.chat_conversation_url}/{self.conversationId}"
 
+        config = self.config
         request_fields = [
             RequestField(
                 name="data",
@@ -121,25 +120,18 @@ class HuggingChat_RE:
                         "id": self.messageId,
                         "is_retry": False,
                         "is_continue": False,
-                        "web_search": web_search,
-                        "tools": {
-                            "websearch": web_search,
-                            "fetch_url": True,
-                            "document_parser": True,
-                            "query_calculator": False,
-                            "image_editing": False,
-                            "image_generation": True,
-                        },
+                        "web_search": config["websearch"],
+                        "tools": config,
                     },
                     ensure_ascii=False,
                 ),
                 headers={"Content-Disposition": 'form-data; name="data"'},
             ),
         ]
-        random_boundary = f"----WebKitFormBoundary{''.join(random.sample(string.ascii_letters + string.digits, 16))}"
-        content, content_type = encode_multipart_formdata(request_fields, boundary=random_boundary)
+        content, content_type = encode_multipart_formdata(request_fields, boundary=self.generate_random_boundary())
         headers = self.headers | {"Content-Type": content_type}
         req = self.async_client.build_request("POST", url, content=content, headers=headers, timeout=None)
         response = await self.async_client.send(req, stream=True)
-        print("Hugging Chat Response Status Code:", response.status_code)
+        color_print(f"Hugging Chat Response Status Code: {response.status_code}", "blue")
+        await self._delete_all_conversation()
         return response

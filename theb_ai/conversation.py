@@ -2,10 +2,8 @@ import httpx
 import json
 import random
 from fastapi import HTTPException
-from fastapi.encoders import jsonable_encoder
 from .Theb_AI_Login import Theb_API_JSON_PATH, start_async_tasks as generate_api_token
-from schemas import MessageJsonData
-from utility import get_user_agent
+from utility import color_print, get_user_agent
 
 
 class TheB_AI_RE:
@@ -77,24 +75,24 @@ class TheB_AI_RE:
         api_info = self._load_api_info()
         return {"organization_id": api_info[0]["ORGANIZATION_ID"], "api_key": api_info[0]["API_KEY"]}
 
-    async def conversation(self, message_json_data: MessageJsonData):
+    async def conversation(
+        self, model: str = "llama-3-8b", text: str = "Hello!", temperature: float = 0.5, top_p: int = 1
+    ):
         chat_models = await self._init_chat_models()
 
         conversation_url = (
             f"{self.theb_ai_api_url}/conversation?org_id={self.organization_id}&req_rand={random.random()}"
         )
         request_payload = {
-            "text": json.dumps(
-                [jsonable_encoder(message) for message in message_json_data.messages], ensure_ascii=False
-            ),
+            "text": text,
             # Default to Llama 3 8B
-            "model": chat_models.get(message_json_data.model, "c60d009ce85f47f087952f17eead4eab"),
+            "model": chat_models.get(model, "c60d009ce85f47f087952f17eead4eab"),
             "functions": [],
             "attachments": [],
             "model_params": {
                 "system_prompt": "",
-                "temperature": message_json_data.temperature,
-                "top_p": message_json_data.top_p,
+                "temperature": temperature,
+                "top_p": top_p,
                 "frequency_penalty": "0",
                 "presence_penalty": "0",
                 "long_term_memory": "ltm",
@@ -106,7 +104,7 @@ class TheB_AI_RE:
         )
         response = await self.async_client.send(req, stream=True)
 
-        print("TheB AI Response Status Code:", response.status_code)
+        color_print(f"TheB AI Response Status Code: {response.status_code}", "blue")
         if response.status_code == 400:
             # Sometimes TheB AI will update their models to require a minimum balance
             try:
@@ -119,9 +117,9 @@ class TheB_AI_RE:
                     status_code=400, detail="This model requires a minimum balance, please change the model."
                 )
             else:
-                print("API Token expired. Change and try again.")
+                color_print("API Token expired. Change and try again.", "yellow")
                 self._remove_apis()
-                return await self.conversation(message_json_data)
+                return await self.conversation(model, text, temperature, top_p)
         elif response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail="API request failed")
         else:

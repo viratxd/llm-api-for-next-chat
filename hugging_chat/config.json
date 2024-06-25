@@ -1,0 +1,8 @@
+{
+    "websearch": false,
+    "fetch_url": false,
+    "document_parser": false,
+    "query_calculator": false,
+    "image_editing": false,
+    "image_generation": true
+}

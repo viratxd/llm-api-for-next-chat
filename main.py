@@ -152,14 +152,6 @@ async def openai_chat_completions(
 
                         try:
                             json_content = json.loads(line_content)
-
-                            # sometimes the response status is 200 but still contains error message
-                            if "error" in json_content and json_content["error"]:
-                                color_print(f"200 response with error: {json_content['error']}", "yellow")
-                                openai_data.choices = [Choices(delta=Message(content=json_content["error"]))]
-                                yield f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
-                                break
-
                             message = json_content["message"]
                             message = Message(**message)
                         except (json.JSONDecodeError, KeyError, TypeError, ValidationError):

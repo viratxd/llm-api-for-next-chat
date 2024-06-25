@@ -1,9 +1,10 @@
-requests
+fastapi
+pydantic>=2.7
 fake-useragent
+requests
 selenium
 webdriver-manager
 webscout
 tls-client
-fastapi
 pillow
 environs

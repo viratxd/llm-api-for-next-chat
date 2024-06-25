@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 import random
+import re
+import time
 import uuid
 from datetime import datetime, timezone
 from fastapi import HTTPException
@@ -37,16 +39,21 @@ class ChatGPT_Web_RE:
         name = "anon" if self.is_anonymous else "api"
         return f"backend-{name}"
 
-    async def _parse_openai_error_response(self, response: Response) -> dict:
-        if response.astream_task:
-            async for line in response.aiter_lines():
-                if line:
-                    error_response = json.loads(line.decode("utf-8"))
-        else:
-            error_response = response.json()
-        if "detail" in error_response:
-            return error_response["detail"]
-        color_print(f"OpenAI Error Response: {error_response}", "red")
+    async def _parse_openai_error_response(self, response: Response) -> dict | str:
+        try:
+            if response.astream_task:
+                async for line in response.aiter_lines():
+                    if line:
+                        line_content = re.sub("^data: ", "", line.decode("utf-8"))
+                        error_response = json.loads(line_content)
+                        break
+            else:
+                error_response = response.json()
+            if "detail" in error_response:
+                color_print(f"OpenAI Error Response: {error_response}", "red")
+                return error_response["detail"]
+        except:
+            pass
         return "Unknown error occurred."
 
     async def _set_access_token(self) -> None:
@@ -107,7 +114,10 @@ class ChatGPT_Web_RE:
                     status_code=response.status_code, detail=await self._parse_openai_error_response(response)
                 )
             response_json = response.json()
-            if self.proof_token is None:
+            # reload until arkose is not required
+            if self.proof_token is None or response_json.get("arkose"):
+                color_print("Generating proof token...", "yellow")
+                time.sleep(1)
                 pow = response_json["proofofwork"]
                 self.proof_token = self._generate_proof_token(seed=pow["seed"], difficulty=pow["difficulty"])
                 response_json = await self._chat_requirements()
@@ -161,12 +171,18 @@ class ChatGPT_Web_RE:
             timeout=None,
         )
         color_print(f"ChatGPT Web Response Status Code: {response.status_code}", "blue")
-        if response.status_code == 403 and self.max_retries > 0:
-            color_print("Retrying chat request...", "yellow")
-            self.max_retries -= 1
-            self.proof_token = None
-            response = await self.conversation(model, messages)
-        elif response.status_code != 200 or self.max_retries == 0:
+        if response.status_code == 403:
+            if self.max_retries > 0:
+                color_print("Retrying chat request...", "yellow")
+                self.max_retries -= 1
+                self.proof_token = None
+                response = await self.conversation(model, messages)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Maximum retries reached. Please try again later.",
+                )
+        elif response.status_code != 200:
             raise HTTPException(
                 status_code=response.status_code, detail=await self._parse_openai_error_response(response)
             )

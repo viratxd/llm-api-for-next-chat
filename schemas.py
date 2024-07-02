@@ -5,16 +5,16 @@ from PIL import Image
 from pydantic import BaseModel, field_validator
 
 
-class ImageSource(BaseModel):
+class Claude_ImageSource(BaseModel):
     data: str
     media_type: str
     type: str
 
     @field_validator("data")
     @classmethod
-    def compress_image(cls, value):
+    def compress_image(cls, base64_image):
         # Convert base64 image to PIL Image
-        image_bytes = base64.b64decode(value)
+        image_bytes = base64.b64decode(base64_image)
         image = Image.open(io.BytesIO(image_bytes))
 
         # Resize image to max 512x512
@@ -23,14 +23,17 @@ class ImageSource(BaseModel):
         # Convert PIL Image to base64
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
+        return base64.b64encode(buffered.getvalue()).decode()
 
-        return img_str
+
+class OpenAI_ImageURL(BaseModel):
+    url: str
 
 
 class Content(BaseModel):
     text: str = None
-    source: ImageSource = None
+    source: Claude_ImageSource = None
+    image_url: OpenAI_ImageURL = None
     type: str
 
 
@@ -49,6 +52,7 @@ class Message(BaseModel):
     role: str = None
     content: str | list[Content] | ChatGPT_Web_Content
     author: Optional[Author] = None
+    status: Optional[str] = None
 
 
 class MessageJsonData(BaseModel):

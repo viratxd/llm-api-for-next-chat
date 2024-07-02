@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 import time
+from curl_cffi.requests.errors import RequestsError
 from pathlib import Path
 from pydantic import ValidationError
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException, Request
@@ -135,7 +136,7 @@ async def openai_chat_completions(
             background_tasks.add_task(resp.aclose)
             return StreamingResponse(resp.aiter_raw(), status_code=resp.status_code, headers=response_headers)
         else:
-            response = await chatgpt_web.conversation(model, messages_str)
+            response = await chatgpt_web.conversation(model, comletions_json_data.messages)
 
             # imitate to openai completions response
             async def content_generator():
@@ -143,27 +144,37 @@ async def openai_chat_completions(
                 yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else "")
 
                 accumulated_response_text = ""
-                async for line in response.aiter_lines():
-                    if line:
-                        line_content = re.sub("^data: ", "", line.decode("utf-8"))
-                        if line_content == "[DONE]":
-                            yield get_openai_chunk_response_end(model, stream)
-                            break
+                try:
+                    async for line in response.aiter_lines():
+                        if line:
+                            line_content = re.sub("^data: ", "", line.decode("utf-8"))
+                            if line_content == "[DONE]":
+                                yield get_openai_chunk_response_end(model, stream)
+                                break
 
-                        try:
-                            json_content = json.loads(line_content)
-                            message = json_content["message"]
-                            message = Message(**message)
-                        except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
-                            color_print(f"Not supported line: {line_content}", "yellow")
-                            continue
-                        if message.author.role == "assistant":
-                            text_delta = message.content.parts[0].replace(accumulated_response_text, "")
-                            openai_data.choices = [Choices(delta=Message(content=text_delta))]
-                            yield (
-                                f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta
-                            )
-                            accumulated_response_text = message.content.parts[0]
+                            try:
+                                json_content = json.loads(line_content)
+                                message = json_content["message"]
+                                message = Message(**message)
+                            except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
+                                color_print(f"Not supported line: {line_content}", "yellow")
+                                continue
+                            if message.author.role == "assistant" and message.status == "in_progress":
+                                text_delta = message.content.parts[0].replace(accumulated_response_text, "")
+                                openai_data.choices = [Choices(delta=Message(content=text_delta))]
+                                yield (
+                                    f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
+                                    if stream
+                                    else text_delta
+                                )
+                                accumulated_response_text = message.content.parts[0]
+                except RequestsError as e:
+                    color_print(str(e), "red")
+                    # markdown red color
+                    openai_data.choices = [
+                        Choices(delta=Message(content="\n```diff\n- Something went wrong, please try again.\n```"))
+                    ]
+                    yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta)
 
     # imitate to openai completions response
     elif model in theb_ai.model_key_mapping.values():

@@ -35,8 +35,8 @@ class HuggingChat_RE:
             "Origin": "https://huggingface.co",
         }
         self.async_client = async_client or httpx.AsyncClient()
-        self.conversationId = None
-        self.messageId = None
+        self.conversation_id = None
+        self.message_id = None
 
     @property
     def hf_chat(self) -> str:
@@ -58,8 +58,8 @@ class HuggingChat_RE:
 
         while retries <= max_retries:
             try:
-                self.conversationId = await self._find_conversation_id()
-                self.messageId = await self._find_message_id()
+                self.conversation_id = await self._find_conversation_id()
+                self.message_id = await self._find_message_id()
                 break
             except httpx.ReadTimeout:
                 color_print("ReadTimeout Error: Retrying...", "yellow")
@@ -79,7 +79,7 @@ class HuggingChat_RE:
         return response_json["conversationId"]
 
     async def _find_message_id(self) -> str:
-        url = f"{self.chat_conversation_url}/{self.conversationId}/__data.json?x-sveltekit-invalidated=11"
+        url = f"{self.chat_conversation_url}/{self.conversation_id}/__data.json?x-sveltekit-invalidated=11"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
         response_json = response.json()
@@ -95,9 +95,9 @@ class HuggingChat_RE:
         color_print("All conversation deleted.", "green")
 
     async def generate_image(self, sha: str):
-        if not self.conversationId:
+        if not self.conversation_id:
             await self._init_conversation()
-        url = f"{self.chat_conversation_url}/{self.conversationId}/output/{sha}"
+        url = f"{self.chat_conversation_url}/{self.conversation_id}/output/{sha}"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
         return response
@@ -108,7 +108,7 @@ class HuggingChat_RE:
 
         await self._init_conversation()
 
-        url = f"{self.chat_conversation_url}/{self.conversationId}"
+        url = f"{self.chat_conversation_url}/{self.conversation_id}"
 
         config = self.config
         request_fields = [
@@ -117,7 +117,7 @@ class HuggingChat_RE:
                 data=json.dumps(
                     {
                         "inputs": query,
-                        "id": self.messageId,
+                        "id": self.message_id,
                         "is_retry": False,
                         "is_continue": False,
                         "web_search": config["websearch"],

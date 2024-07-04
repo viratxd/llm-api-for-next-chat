@@ -72,22 +72,31 @@ class ChatGPT_Web_RE:
                 )
             self.headers["Authorization"] = f"Bearer {response_json['accessToken']}"
 
-    def _set_file_accept_type(self):
+    async def _set_file_accept_type(self) -> None:
         # only for login users
         if not self.is_anonymous:
-            response = requests.get(f"{self.openai_url}/backend-api/models", headers=self.headers, impersonate="chrome")
-            if response.status_code == 401:
-                # token expired, get new token
-                color_print("Access token expired, getting new token...", "yellow")
-                self._set_access_token()
-                return self._get_file_accept_type()
-            response_json = response.json()
-            for model in response_json["models"]:
-                if model.get("product_features"):
-                    attachments = model["product_features"]["attachments"]
-                    self.accepted_file_mime_types = attachments["accepted_mime_types"]
-                    self.accepted_image_mime_types = attachments["image_mime_types"]
-                    break
+            async with AsyncSession() as session:
+                response = await session.get(
+                    f"{self.openai_url}/backend-api/models", headers=self.headers, impersonate="chrome"
+                )
+                if response.status_code != 200:
+                    color_print(f"Failed to get models: {response.status_code}", "red")
+                    raise HTTPException(
+                        status_code=response.status_code, detail=await self._parse_openai_error_response(response)
+                    )
+                response_json = response.json()
+                for model in response_json["models"]:
+                    if model.get("product_features"):
+                        attachments = model["product_features"]["attachments"]
+                        self.accepted_file_mime_types = attachments["accepted_mime_types"]
+                        self.accepted_image_mime_types = attachments["image_mime_types"]
+                        break
+                else:
+                    color_print(f"Available models: {response_json}", "yellow")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="There are no available models with attachments now, maybe try again later.",
+                    )
 
     def _generate_proof_token(self, seed: str, difficulty: str) -> str:
         prefix = "gAAAAAB"
@@ -123,13 +132,15 @@ class ChatGPT_Web_RE:
                 headers=self.headers,
                 impersonate="chrome",
             )
-            if response.status_code == 401:
+            if response.status_code == 401 and self.max_retries > 0:
                 # token expired, get new token
                 color_print("Access token expired, getting new token...", "yellow")
                 self._set_access_token()
+                self.max_retries -= 1
                 return await self._chat_requirements()
             elif response.status_code != 200:
                 color_print(f"Failed to get chat requirements: {response.status_code}", "red")
+                self.max_retries = 3
                 raise HTTPException(
                     status_code=response.status_code, detail=await self._parse_openai_error_response(response)
                 )
@@ -141,84 +152,94 @@ class ChatGPT_Web_RE:
                 pow = response_json["proofofwork"]
                 self.proof_token = self._generate_proof_token(seed=pow["seed"], difficulty=pow["difficulty"])
                 response_json = await self._chat_requirements()
-            return response_json
+        return response_json
 
-    def _upload_file(self, file_content, mime_type) -> dict:
+    async def _get_uploaded_file_detail(self, file_id: str) -> dict:
+        file_detail_url = f"{self.openai_url}/backend-api/files/{file_id}"
+        async with AsyncSession() as session:
+            response = await session.get(file_detail_url, headers=self.headers, impersonate="chrome")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get file details: {response.status_code}")
+        return response.json()
+
+    async def _upload_file(self, file_content, mime_type) -> dict:
+        # generate file name
+        file_extension = mimetypes.guess_extension(mime_type)
+        random_file_name = uuid.uuid4().hex
+        file_name = f"{random_file_name}{file_extension}"
+
+        await self._set_file_accept_type()
         width = None
         height = None
-        if mime_type.startswith("image/"):
+        if mime_type in self.accepted_image_mime_types:
             try:
                 with Image.open(BytesIO(file_content)) as img:
                     width, height = img.width, img.height
+                file_use_cases = "multimodal"
             except Exception as e:
                 color_print(f"Failed to get image dimensions: {e}, setting mime_type to text/plain", "yellow")
                 mime_type = "text/plain"
-
-        file_size = len(file_content)
-
-        # generate file name
-        file_extension = mimetypes.guess_extension(mime_type)
-        sha256_hash = hashlib.sha256(file_content).hexdigest()
-        file_name = f"{sha256_hash}{file_extension}"
-
-        self._set_file_accept_type()
-        if mime_type in self.accepted_image_mime_types:
-            file_use_cases = "multimodal"
-        elif mime_type in self.accepted_file_mime_types:
+        if mime_type in self.accepted_file_mime_types:
             file_use_cases = "my_files"
-        else:
+        elif mime_type not in self.accepted_image_mime_types + self.accepted_file_mime_types:
             file_use_cases = "ace_upload"
             mime_type = ""
             color_print(f"File type: {mime_type} not supported, setting mime_type to empty string", "yellow")
 
-        # get url for file upload
-        upload_api_url = f"{self.openai_url}/backend-api/files"
-        upload_request_payload = {
-            "file_name": file_name,
-            "file_size": file_size,
-            "use_case": file_use_cases,
-        }
-        upload_response = requests.post(
-            upload_api_url, json=upload_request_payload, headers=self.headers, impersonate="chrome"
-        )
-        if upload_response.status_code != 200:
-            raise HTTPException(status_code=upload_response.status_code, detail="Failed to get upload URL")
-        upload_data = upload_response.json()
-        upload_url = upload_data.get("upload_url")
-        file_id = upload_data.get("file_id")
+        async with AsyncSession() as session:
+            # get url for file upload
+            upload_api_url = f"{self.openai_url}/backend-api/files"
+            file_size = len(file_content)
+            upload_request_payload = {
+                "file_name": file_name,
+                "file_size": file_size,
+                "use_case": file_use_cases,
+            }
+            upload_response = await session.post(
+                upload_api_url, json=upload_request_payload, headers=self.headers, impersonate="chrome"
+            )
+            if upload_response.status_code != 200:
+                raise HTTPException(
+                    status_code=upload_response.status_code,
+                    detail=await self._parse_openai_error_response(upload_response),
+                )
+            upload_data = upload_response.json()
+            upload_url = upload_data.get("upload_url")
+            file_id = upload_data.get("file_id")
 
-        # upload file
-        put_headers = {"Content-Type": mime_type, "X-Ms-Blob-Type": "BlockBlob"}  # Azure Blob Storage headers
-        put_response = requests.put(upload_url, data=file_content, headers=put_headers, impersonate="chrome")
-        if put_response.status_code != 201:
-            raise HTTPException(status_code=put_response.status_code, detail="Failed to upload file")
+            # upload file
+            put_headers = {"Content-Type": mime_type, "X-Ms-Blob-Type": "BlockBlob"}  # Azure Blob Storage headers
+            put_response = await session.put(upload_url, data=file_content, headers=put_headers, impersonate="chrome")
+            if put_response.status_code != 201:
+                raise HTTPException(
+                    status_code=put_response.status_code, detail=await self._parse_openai_error_response(put_response)
+                )
 
-        # check file upload completion
-        check_url = f"{self.openai_url}/backend-api/files/{file_id}/uploaded"
-        check_response = requests.post(check_url, json={}, headers=self.headers, impersonate="chrome")
-        if check_response.status_code != 200:
-            raise HTTPException(status_code=check_response.status_code, detail="Failed to check file upload completion")
+            # check file upload completion
+            check_url = f"{self.openai_url}/backend-api/files/{file_id}/uploaded"
+            check_response = await session.post(check_url, json={}, headers=self.headers, impersonate="chrome")
+            if check_response.status_code != 200:
+                raise HTTPException(
+                    status_code=check_response.status_code,
+                    detail=await self._parse_openai_error_response(check_response),
+                )
+            check_data = check_response.json()
+            if check_data.get("status") != "success":
+                raise HTTPException(status_code=400, detail="File upload completion check not successful")
 
-        check_data = check_response.json()
-        if check_data.get("status") != "success":
-            raise HTTPException(status_code=400, detail="File upload completion check not successful")
-
-        file_size_tokens = None
-        # get fille_size_tokens
-        if mime_type in self.accepted_file_mime_types:
-            detail_url = f"{self.openai_url}/backend-api/files/{file_id}"
-            while True:
-                detail_response = requests.get(detail_url, headers=self.headers, impersonate="chrome")
-                if detail_response.status_code != 200:
-                    raise HTTPException(
-                        status_code=detail_response.status_code, detail="Failed to get file_size_tokens"
-                    )
-                detail_data = detail_response.json()
-                if detail_data.get("file_size_tokens"):
-                    file_size = detail_data["size"]
-                    file_size_tokens = detail_data["file_size_tokens"]
-                    break
-                time.sleep(1)
+            file_size_tokens = None
+            # get fille_size_tokens
+            if mime_type in self.accepted_file_mime_types:
+                while True:
+                    try:
+                        file_detail = await self._get_uploaded_file_detail(file_id)
+                        if file_detail.get("file_size_tokens"):
+                            file_size = file_detail["size"]
+                            file_size_tokens = file_detail["file_size_tokens"]
+                            break
+                        time.sleep(1)
+                    except Exception:
+                        raise HTTPException(status_code=400, detail="Failed to get file_size_tokens")
 
         return {
             "file_id": file_id,
@@ -230,7 +251,35 @@ class ChatGPT_Web_RE:
             "file_size_tokens": file_size_tokens,
         }
 
-    def _generate_formatted_messages(self, messages: list[Message]) -> list:
+    async def _get_file_metadata(self, file_content, mime_type) -> dict:
+        sha256_hash = hashlib.sha256(file_content).hexdigest()
+
+        file_cache_path = "chatgpt_web/file_cache.json"
+        # load file_cache.json file
+        try:
+            with open(file_cache_path, "r") as f:
+                file_cache = json.load(f)
+            cache_data = file_cache.get(sha256_hash)
+            if cache_data:
+                # check if file is still available in cloud
+                try:
+                    await self._get_uploaded_file_detail(cache_data["file_id"])
+                    color_print(f"File found in cache: {cache_data}", "green")
+                    return cache_data
+                except Exception:
+                    color_print("File has been deleted from cloud, re-uploading...", "yellow")
+        except FileNotFoundError:
+            file_cache = {}
+
+        color_print("Uploading file...", "yellow")
+        new_file_data = await self._upload_file(file_content, mime_type)
+        color_print(f"File uploaded: {new_file_data}", "green")
+        with open(file_cache_path, "w") as f:
+            file_cache[sha256_hash] = new_file_data
+            f.write(json.dumps(file_cache, indent=4))
+        return new_file_data
+
+    async def _generate_formatted_messages(self, messages: list[Message]) -> list:
         formatted_messages = []
 
         for message in messages:
@@ -258,15 +307,17 @@ class ChatGPT_Web_RE:
                             # fetch image from URL
                             else:
                                 tmp_headers = {"User-Agent": self.user_agent}
-                                file_response = requests.get(url=file_url, headers=tmp_headers, impersonate="chrome")
-                                file_content = file_response.content
-                                mime_type = file_response.headers.get("Content-Type", "").split(";")[0].strip()
+                                async with AsyncSession() as session:
+                                    file_response = await session.get(
+                                        file_url, headers=tmp_headers, impersonate="chrome"
+                                    )
+                                    file_content = file_response.content
+                                    mime_type = file_response.headers.get("Content-Type", "").split(";")[0].strip()
                         except Exception as e:
                             color_print(f"Failed to fetch image: {e}", "red")
                             continue
 
-                        file_metadata = self._upload_file(file_content, mime_type)
-                        color_print(f"Uploaded file: {file_metadata}", "green")
+                        file_metadata = await self._get_file_metadata(file_content, mime_type)
                         mime_type = file_metadata["mime_type"]
                         attachment = {
                             "name": file_metadata["file_name"],
@@ -275,7 +326,7 @@ class ChatGPT_Web_RE:
                             "size": file_metadata["size_bytes"],
                         }
                         content_type = "text"
-                        if mime_type.startswith("image/"):
+                        if mime_type in self.accepted_image_mime_types:
                             content_type = "multimodal_text"
                             new_part = {
                                 "asset_pointer": f"file-service://{file_metadata['file_id']}",
@@ -315,7 +366,7 @@ class ChatGPT_Web_RE:
             "action": "next",
             "model": self.alias_model.get(model, model),
             "parent_message_id": str(uuid.uuid4()),
-            "messages": self._generate_formatted_messages(messages),
+            "messages": await self._generate_formatted_messages(messages),
             "conversation_id": None,
             "history_and_training_disabled": True,
             "conversation_mode": {

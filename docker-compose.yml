@@ -7,6 +7,7 @@ services:
       - 5000:5000
     restart: unless-stopped
     volumes:
+      - ./chatgpt_web/file_cache.json:/app/chatgpt_web/file_cache.json
       - ./theb_ai/Theb_API.json:/app/theb_ai/Theb_API.json
       - ./hugging_chat/config.json:/app/hugging_chat/config.json
       - ./generated_images:/app/generated_images

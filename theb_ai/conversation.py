@@ -10,6 +10,7 @@ class TheB_AI_RE:
     theb_ai_api_url = "https://beta.theb.ai/api"
     model_key_mapping = {
         "TheB.AI": "theb-ai",
+        "Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620",
         "Claude 3 Opus": "claude-3-opus-20240229",
         "Claude 3 Sonnet": "claude-3-sonnet-20240229",
         "Claude 3 Haiku": "claude-3-haiku-20240307",
@@ -31,12 +32,40 @@ class TheB_AI_RE:
         "Qwen1.5 7B": "qwen1.5-7b",
         "Yi 34B": "yi-34b",
     }
+    organization_id = None
+    headers = None
 
     def __init__(self, async_client: httpx.AsyncClient = None):
-        api_info = self._get_api_info()
-        self.organization_id, self.api_key = api_info["organization_id"], api_info["api_key"]
-        self.headers = {"Authorization": f"Bearer {self.api_key}", "User-Agent": get_user_agent()}
+        self.api_info = self._load_api_info()
+        self._init_api_info()
         self.async_client = async_client or httpx.AsyncClient()
+
+    def _load_api_info(self) -> list[dict]:
+        try:
+            with open(Theb_API_JSON_PATH, "r") as file:
+                api_info = json.load(file)
+            if len(api_info) == 0:
+                raise Exception()
+        except Exception:
+            generate_api_token()
+            return self._load_api_info()
+        else:
+            return api_info
+
+    def _init_api_info(self, index: int = 0) -> None:
+        self.organization_id = self.api_info[index]["ORGANIZATION_ID"]
+        self.headers = {
+            "Authorization": f"Bearer {self.api_info[index]['API_KEY']}",
+            "User-Agent": get_user_agent(),
+        }
+
+    def _remove_apis(self) -> None:
+        with open(Theb_API_JSON_PATH, "r") as file:
+            data = json.load(file)
+        if data:
+            data.pop(0)
+        with open(Theb_API_JSON_PATH, "w") as file:
+            json.dump(data, file, indent=4)
 
     async def _init_chat_models(self) -> dict[str, str]:
         chat_models = {}
@@ -51,33 +80,38 @@ class TheB_AI_RE:
                 pass
         return chat_models
 
-    def _load_api_info(self) -> list[dict]:
-        try:
-            with open(Theb_API_JSON_PATH, "r") as file:
-                api_info = json.load(file)
-            if len(api_info) == 0:
-                raise Exception()
-        except Exception:
-            generate_api_token()
-            return self._load_api_info()
+    async def _check_balance(self) -> float:
+        url = f"{self.theb_ai_api_url}/organization/balance?org_id={self.organization_id}"
+        response = await self.async_client.get(url, headers=self.headers)
+        response.raise_for_status()
+        response_json = response.json()
+        balance = float(response_json["data"]["balance"])
+        color_print(f"Current Balance: {balance}", "blue")
+        if balance <= 0.0:
+            color_print("Blance out of funds. Changing API token.", "yellow")
+            self._remove_apis()
+            self.api_info = self._load_api_info()
+            self._init_api_info()
+        return balance
+
+    async def _select_target_balance_account(self, target_balance: float) -> None:
+        for i in range(len(self.api_info)):
+            self._init_api_info(i)
+            balance = await self._check_balance()
+            if balance >= target_balance:
+                break
+        # all accounts are not enough balance, generate new and choose the new one
         else:
-            return api_info
-
-    def _remove_apis(self) -> None:
-        with open(Theb_API_JSON_PATH, "r") as file:
-            data = json.load(file)
-        if data:
-            data.pop(0)
-        with open(Theb_API_JSON_PATH, "w") as file:
-            json.dump(data, file, indent=4)
-
-    def _get_api_info(self) -> dict:
-        api_info = self._load_api_info()
-        return {"organization_id": api_info[0]["ORGANIZATION_ID"], "api_key": api_info[0]["API_KEY"]}
+            color_print("All accounts are not enough balance, generating new API token.", "yellow")
+            generate_api_token()
+            self.api_info = self._load_api_info()
+            self.api_info.reverse()
+            self._init_api_info()
 
     async def conversation(
         self, model: str = "llama-3-8b", text: str = "Hello!", temperature: float = 0.5, top_p: int = 1
     ):
+        await self._check_balance()
         chat_models = await self._init_chat_models()
 
         conversation_url = (
@@ -90,7 +124,7 @@ class TheB_AI_RE:
             "functions": [],
             "attachments": [],
             "model_params": {
-                "system_prompt": "",
+                "system_prompt": "Parse the following message format according to OpenAI's API style, focusing solely on the content part of the assistant role. Ensure the response contains only the requested information without extra text or introductions.",
                 "temperature": temperature,
                 "top_p": top_p,
                 "frequency_penalty": "0",
@@ -105,22 +139,19 @@ class TheB_AI_RE:
         response = await self.async_client.send(req, stream=True)
 
         color_print(f"TheB AI Response Status Code: {response.status_code}", "blue")
-        if response.status_code == 400:
+        if response.status_code != 200:
             # Sometimes TheB AI will update their models to require a minimum balance
             try:
                 result_content = await response.aread()
                 response_json = json.loads(result_content)
-                if response_json["data"]["detail"].startswith("This model requires a minimum balance"):
-                    raise Exception()
-            except Exception:
-                raise HTTPException(
-                    status_code=400, detail="This model requires a minimum balance, please change the model."
-                )
-            else:
-                color_print("API Token expired. Change and try again.", "yellow")
-                self._remove_apis()
+                detail = response_json["data"]["detail"]
+                # search nubmer after $ sign
+                required_min_balance = float(detail.split("$")[1])
+                if required_min_balance > 0.05:
+                    color_print(f"API error: {detail}", "yellow")
+                    raise Exception("Required minimum balance is above trial limit.")
+                await self._select_target_balance_account(required_min_balance)
                 return await self.conversation(model, text, temperature, top_p)
-        elif response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="API request failed")
-        else:
-            return response
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+        return response

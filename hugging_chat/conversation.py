@@ -25,14 +25,17 @@ class HuggingChat_RE:
     }
 
     def __init__(
-        self, model: str = "command-r-plus", system_prompt: str = "", async_client: httpx.AsyncClient = None
+        self,
+        model: str = "command-r-plus",
+        system_prompt: str = "Act as an AI assistant that responds to user inputs in the language they use. Parse the provided JSON-formatted conversation history, but respond only to the final user message without referencing the JSON format. Maintain consistency with previous responses and adapt to the user's language preference.",
+        async_client: httpx.AsyncClient = None,
     ) -> None:
         self.model = self.model_key_mapping.get(model, "CohereForAI/c4ai-command-r-plus")
         self.system_prompt = system_prompt
         self.headers = {
             "Cookie": f"hf-chat={self.hf_chat}",
             "User-Agent": get_user_agent(),
-            "Origin": "https://huggingface.co",
+            "Origin": self.hugging_face_url,
         }
         self.async_client = async_client or httpx.AsyncClient()
         self.conversation_id = None

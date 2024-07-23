@@ -124,7 +124,7 @@ class TheB_AI_RE:
             "functions": [],
             "attachments": [],
             "model_params": {
-                "system_prompt": "Parse the following message format according to OpenAI's API style, focusing solely on the content part of the assistant role. Ensure the response contains only the requested information without extra text or introductions.",
+                "system_prompt": "Act as an AI assistant that responds to user inputs in the language they use. Parse the provided JSON-formatted conversation history, but respond only to the final user message without referencing the JSON format. Maintain consistency with previous responses and adapt to the user's language preference.",
                 "temperature": temperature,
                 "top_p": top_p,
                 "frequency_penalty": "0",

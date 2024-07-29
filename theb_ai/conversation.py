@@ -14,23 +14,26 @@ class TheB_AI_RE:
         "Claude 3 Opus": "claude-3-opus-20240229",
         "Claude 3 Sonnet": "claude-3-sonnet-20240229",
         "Claude 3 Haiku": "claude-3-haiku-20240307",
+        "Llama 3.1 405B": "llama-3.1-405b",
+        "Llama 3.1 70B": "llama-3.1-70b",
+        "Llama 3.1 8B": "llama-3.1-8b",
         "Llama 3 70B": "llama-3-70b",
         "Llama 3 8B": "llama-3-8b",
-        "CodeLlama 70B": "codellama-70b",
-        "CodeLlama 34B": "codellama-34b",
-        "CodeLlama 13B": "codellama-13b",
-        "CodeLlama 7B": "codellama-7b",
         "Mixtral 8x22B": "mixtral-8x22b",
         "Mixtral 8x7B": "mixtral-8x7b",
-        "Mixtral 7B": "mixtral-7b",
+        "Mistral 7B": "mistral-7b",
         "WizardLM 2 8x22B": "wizardlm-2-8x22b",
-        "DBRx Instruct": "dbrx-instruct",
-        "Qwen1.5 110B": "qwen1.5-110b",
-        "Qwen1.5 72B": "qwen1.5-72b",
-        "Qwen1.5 32B": "qwen1.5-32b",
-        "Qwen1.5 14B": "qwen1.5-14b",
-        "Qwen1.5 7B": "qwen1.5-7b",
+        "DBRX Instruct": "dbrx-instruct",
+        "Qwen 2 72B": "qwen-2-72b",
+        "Qwen 1.5 110B": "qwen-1.5-110b",
+        "Qwen 1.5 72B": "qwen-1.5-72b",
+        "Qwen 1.5 32B": "qwen-1.5-32b",
+        "Qwen 1.5 14B": "qwen-1.5-14b",
+        "Qwen 1.5 7B": "qwen-1.5-7b",
+        "Deepseek LLM 67B": "deepseek-llm-67b",
         "Yi 34B": "yi-34b",
+        "Gemma 2 27B": "gemma-2-27b",
+        "Gemma 2 9B": "gemma-2-9b",
     }
     organization_id = None
     headers = None
@@ -153,5 +156,6 @@ class TheB_AI_RE:
                 await self._select_target_balance_account(required_min_balance)
                 return await self.conversation(model, text, temperature, top_p)
             except Exception as e:
+                color_print(f"{detail=}", "red")
                 raise HTTPException(status_code=400, detail=str(e))
         return response

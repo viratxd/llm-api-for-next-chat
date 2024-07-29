@@ -34,6 +34,8 @@ services:
         gpt-4,\
         gpt-3.5-turbo,\
         gpt-3.5,\
+        gemma-2-9b,\
+        gemma-2-7b,\
         gemini-1.5-pro-latest,\
         gemini-1.5-flash-latest,\
         gemini-pro,\
@@ -42,25 +44,28 @@ services:
         claude-3-opus-20240229,\
         claude-3-sonnet-20240229,\
         claude-3-haiku-20240307,\
+        llama-3.1-405b,\
+        llama-3.1-405b-instruct,\
+        llama-3.1-70b-instruct,\
+        llama-3.1-70b,\
+        llama-3.1-8b,\
         llama-3-70b,\
         llama-3-70b-instruct,\
         llama-3-8b,\
-        codellama-70b,\
-        codellama-34b,\
-        codellama-13b,\
-        codellama-7b,\
         mixtral-8x22b,\
         mixtral-8x7b,\
         mixtral-8x7b-instruct,\
-        mixtral-7b,\
+        mistral-7b,\
         mistral-7b-instruct,\
         wizardlm-2-8x22b,\
         dbrx-instruct,\
-        qwen1.5-110b,\
-        qwen1.5-72b,\
-        qwen1.5-32b,\
-        qwen1.5-14b,\
-        qwen1.5-7b,\
+        qwen-2-72b,\
+        qwen-1.5-110b,\
+        qwen-1.5-72b,\
+        qwen-1.5-32b,\
+        qwen-1.5-14b,\
+        qwen-1.5-7b,\
+        deepseek-llm-67b,\
         yi-1.5-34b-chat,\
         yi-34b,\
         theb-ai,\

@@ -205,7 +205,7 @@ async def openai_chat_completions(
                         break
 
     elif model in hf_chat.model_key_mapping:
-        response = await hf_chat.request_conversation(messages_str)
+        response = await hf_chat.request_conversation(messages_str, model)
 
         if response.status_code != 200:
             return JSONResponse(json.loads(await response.aread()), status_code=response.status_code)

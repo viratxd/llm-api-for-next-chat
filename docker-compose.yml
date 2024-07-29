@@ -50,7 +50,6 @@ services:
         llama-3.1-70b,\
         llama-3.1-8b,\
         llama-3-70b,\
-        llama-3-70b-instruct,\
         llama-3-8b,\
         mixtral-8x22b,\
         mixtral-8x7b,\
@@ -70,9 +69,7 @@ services:
         yi-34b,\
         theb-ai,\
         command-r-plus,\
-        zephry-141b-a35b,\
         nous-hermes-2-mixtral-8x7b-dpo,\
-        gemma-1.1-7b-instruct,\
         phi-3-mini-4k-instruct"
     env_file:
       - .env

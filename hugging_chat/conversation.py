@@ -16,13 +16,10 @@ class HuggingChat_RE:
         "command-r-plus": "CohereForAI/c4ai-command-r-plus",
         "llama-3.1-405b-instruct": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
         "llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "llama-3-70b-instruct": "meta-llama/Meta-Llama-3-70B-Instruct",
-        "zephry-141b-a35b": "HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
         "mixtral-8x7b-instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "mistral-7b-instruct": "mistralai/Mistral-7B-Instruct-v0.3",
         "nous-hermes-2-mixtral-8x7b-dpo": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
         "yi-1.5-34b-chat": "01-ai/Yi-1.5-34B-Chat",
-        "gemma-1.1-7b-instruct": "google/gemma-1.1-7b-it",
         "phi-3-mini-4k-instruct": "microsoft/Phi-3-mini-4k-instruct",
     }
 

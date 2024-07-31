@@ -65,6 +65,8 @@ services:
         qwen-1.5-14b,\
         qwen-1.5-7b,\
         deepseek-llm-67b,\
+        deepseek-chat,\
+        deepseek-code,\
         yi-1.5-34b-chat,\
         yi-34b,\
         theb-ai,\

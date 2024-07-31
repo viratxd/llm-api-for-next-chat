@@ -114,4 +114,4 @@ class OpenAiData(BaseModel):
     id: str
     object: str = Literal["chat.completion", "chat.completion.chunk"]
     model: str
-    usage: Usage = None
+    usage: Optional[Usage] = None

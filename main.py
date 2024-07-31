@@ -28,6 +28,7 @@ from schemas import (
 from theb_ai.conversation import TheB_AI_RE
 from hugging_chat.conversation import HuggingChat_RE
 from chatgpt_web.conversation import ChatGPT_Web_RE
+from deepseek_web.conversation import Deepseek_Web_RE
 from utility import color_print, get_openai_chunk_response, get_openai_chunk_response_end, get_response_headers
 
 env = Env()
@@ -39,6 +40,7 @@ async_client = httpx.AsyncClient()
 theb_ai = TheB_AI_RE(async_client)
 hf_chat = HuggingChat_RE(async_client)
 chatgpt_web = ChatGPT_Web_RE()
+deepseek_web = Deepseek_Web_RE(async_client)
 
 
 @asynccontextmanager
@@ -246,6 +248,22 @@ async def openai_chat_completions(
                         break
                     case _:
                         color_print(f"Unparsed line: {line}", "yellow")
+
+    elif model in deepseek_web.model_key_mapping:
+        response = await deepseek_web.completions(messages_str, model, comletions_json_data.temperature)
+
+        async def content_generator():
+            async for line in response.aiter_lines():
+                if stream:
+                    yield line.encode() + b"\n"
+                else:
+                    if line:
+                        line_content = re.sub("^data: ", "", line)
+                        try:
+                            data = OpenAiData(**json.loads(line_content))
+                        except (json.JSONDecodeError, ValidationError):
+                            continue
+                        yield data.choices[0].delta.content
 
     else:
         raise HTTPException(status_code=400, detail="Model not supported")

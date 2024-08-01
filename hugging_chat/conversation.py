@@ -82,7 +82,7 @@ class HuggingChat_RE:
         color_print(f"Initialised Message ID: {message_id}", "green")
         return message_id
 
-    async def _delete_all_conversation(self) -> None:
+    async def delete_all_conversation(self) -> None:
         delete_url = f"{self.chat_conversation_url}s?/delete"
         headers = self.headers | {"Content-Type": f"multipart/form-data; boundary={self.generate_random_boundary()}"}
         response = await self.async_client.post(delete_url, headers=headers)
@@ -136,5 +136,4 @@ class HuggingChat_RE:
         req = self.async_client.build_request("POST", url, content=content, headers=headers, timeout=None)
         response = await self.async_client.send(req, stream=True)
         color_print(f"Hugging Chat Response Status Code: {response.status_code}", "blue")
-        await self._delete_all_conversation()
         return response

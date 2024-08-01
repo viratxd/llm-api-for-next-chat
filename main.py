@@ -234,7 +234,7 @@ async def openai_chat_completions(
                         image = await hf_chat.generate_image(data.sha)
                         extension = data.mime.split("/")[1]
                         image_file = Path(f"generated_images/{data.sha}.{extension}")
-                        image_file.parent.mkdir(parents=True, exist_ok=True)
+                        image_file.parent.mkdir(parents=True, exist_ok=True, mode=0o777)  # 0o777 is 755 in octal
                         image_file.write_bytes(await image.aread())
                         image_url = f"{API_HOST}/image/{data.sha}.{extension}"
                         markdown_image = f"![{data.name}]({image_url})"
@@ -248,6 +248,8 @@ async def openai_chat_completions(
                         break
                     case _:
                         color_print(f"Unparsed line: {line}", "yellow")
+
+            await hf_chat.delete_all_conversation()
 
     elif model in deepseek_web.model_key_mapping:
         response = await deepseek_web.completions(messages_str, model, comletions_json_data.temperature)

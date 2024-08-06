@@ -36,10 +36,10 @@ services:
         gpt-3.5,\
         gemma-2-9b,\
         gemma-2-27b,\
+        gemini-1.5-pro-exp-0801,\
         gemini-1.5-pro-latest,\
         gemini-1.5-flash-latest,\
-        gemini-pro,\
-        gemini-pro-vision,\
+        gemini-1.0-pro-latest,\
         claude-3-5-sonnet-20240620,\
         claude-3-opus-20240229,\
         claude-3-sonnet-20240229,\

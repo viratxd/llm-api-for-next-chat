@@ -32,7 +32,7 @@ class Deepseek_Web_RE:
     async def _clear_context(self, model_class: str):
         url = f"{self.api_prefix}/chat/clear_context"
         payload = {"append_welcome_message": False, "model_class": model_class}
-        response = await self.async_client.post(url, headers=self.headers, json=payload)
+        response = await self.async_client.post(url, headers=self.headers, json=payload, timeout=None)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 

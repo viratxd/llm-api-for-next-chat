@@ -43,14 +43,20 @@ class Author(BaseModel):
     metadata: dict = {}
 
 
-class ChatGPT_Web_Content(BaseModel):
-    content_type: str = "text"
-    parts: list[str]
+class ChatGPT_WebImageParts(BaseModel):
+    asset_pointer: str
+    width: int
+    height: int
+
+
+class ChatGPT_WebContent(BaseModel):
+    content_type: str = Literal["text", "multimodal_text"]
+    parts: list[str | ChatGPT_WebImageParts]
 
 
 class Message(BaseModel):
     role: str = None
-    content: str | list[Content] | ChatGPT_Web_Content
+    content: str | list[Content] | ChatGPT_WebContent
     author: Optional[Author] = None
     status: Optional[str] = None
 

@@ -161,22 +161,38 @@ async def openai_chat_completions(
                             except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
                                 color_print(f"Not supported line: {line_content}", "yellow")
                                 continue
+                            yield_line = None
                             if message.author.role == "assistant" and message.status == "in_progress":
-                                text_delta = message.content.parts[0].replace(accumulated_response_text, "")
-                                openai_data.choices = [Choices(delta=Message(content=text_delta))]
+                                yield_line = message.content.parts[0].replace(accumulated_response_text, "")
+                                accumulated_response_text = message.content.parts[0]
+                            elif message.author.role == "tool" and message.content.content_type == "multimodal_text":
+                                # download image to generated_images folder and return markdown image
+                                file_id = message.content.parts[0]["asset_pointer"].split("://")[-1]
+                                image_details = await chatgpt_web.download_image(file_id)
+                                file_name = f"{image_details['file_name']}.webp"
+                                image_file = Path(f"generated_images/{file_name}")
+                                image_file.parent.mkdir(
+                                    parents=True, exist_ok=True, mode=0o777
+                                )  # 0o777 is 755 in octal
+                                image_file.write_bytes(image_details["image"])
+                                image_url = f"{API_HOST}/image/{file_name}"
+                                yield_line = f"![]({image_url})"
+
+                            if yield_line is not None:
+                                openai_data.choices = [Choices(delta=Message(content=yield_line))]
                                 yield (
                                     f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
                                     if stream
-                                    else text_delta
+                                    else yield_line
                                 )
-                                accumulated_response_text = message.content.parts[0]
+
                 except RequestsError as e:
                     color_print(str(e), "red")
                     # markdown red color
                     openai_data.choices = [
                         Choices(delta=Message(content="\n```diff\n- Something went wrong, please try again.\n```"))
                     ]
-                    yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta)
+                    yield f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n"
 
     # imitate to openai completions response
     elif model in theb_ai.model_key_mapping.values():
@@ -223,31 +239,29 @@ async def openai_chat_completions(
                 except (json.JSONDecodeError, ValidationError):
                     color_print(f"Erorr parsing response: {line}", "red")
                     raise HTTPException(status_code=400, detail="Error parsing response")
+                yield_line = None
                 match data.type:
                     case "stream":
-                        text_delta = data.token.replace(accumulated_response_text, "").replace("\u0000", "")
-                        openai_data.choices = [Choices(delta=Message(content=text_delta))]
-                        yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else text_delta)
+                        yield_line = data.token.replace(accumulated_response_text, "").replace("\u0000", "")
                         accumulated_response_text = data.token
                     case "file":
                         # download image to generated_images folder and return markdown image
                         image = await hf_chat.generate_image(data.sha)
-                        extension = data.mime.split("/")[1]
-                        image_file = Path(f"generated_images/{data.sha}.{extension}")
+                        file_name = f"{data.sha}.{data.mime}"
+                        image_file = Path(f"generated_images/{file_name}")
                         image_file.parent.mkdir(parents=True, exist_ok=True, mode=0o777)  # 0o777 is 755 in octal
                         image_file.write_bytes(await image.aread())
-                        image_url = f"{API_HOST}/image/{data.sha}.{extension}"
-                        markdown_image = f"![{data.name}]({image_url})"
-
-                        openai_data.choices = [Choices(delta=Message(content=markdown_image))]
-                        yield (
-                            f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else markdown_image
-                        )
+                        image_url = f"{API_HOST}/image/{file_name}"
+                        yield_line = f"![{data.name}]({image_url})"
                     case "finalAnswer":
                         yield get_openai_chunk_response_end(model, stream)
                         break
                     case _:
                         color_print(f"Unparsed line: {line}", "yellow")
+
+                if yield_line is not None:
+                    openai_data.choices = [Choices(delta=Message(content=yield_line))]
+                    yield (f"data: {openai_data.model_dump_json(exclude_unset=True)}\n\n" if stream else yield_line)
 
             await hf_chat.delete_all_conversation()
 

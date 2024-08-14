@@ -22,6 +22,7 @@ class HuggingChat_RE:
         "yi-1.5-34b-chat": "01-ai/Yi-1.5-34B-Chat",
         "phi-3-mini-4k-instruct": "microsoft/Phi-3-mini-4k-instruct",
     }
+    web_search = False
 
     def __init__(self, async_client: httpx.AsyncClient = None) -> None:
         self.headers = {
@@ -42,9 +43,23 @@ class HuggingChat_RE:
         return f"----WebKitFormBoundary{''.join(random.sample(string.ascii_letters + string.digits, 16))}"
 
     @property
-    def config(self) -> dict:
+    def config(self) -> list:
+        config_id_mapping = {
+            "Image Generation": "000000000000000000000001",
+            "Document parser": "000000000000000000000002",
+            "Image editor": "000000000000000000000003",
+            "Calculator": "00000000000000000000000c",
+            "Fetch URL": "00000000000000000000000b",
+            "Web Search": "00000000000000000000000a",
+        }
+
+        config = []
         with open("hugging_chat/config.json", "r") as config_file:
-            config = json.load(config_file)
+            config_json = json.load(config_file)
+            self.web_search = config_json["Web Search"]
+            for tool_name, is_enabled in config_json.items():
+                if is_enabled:
+                    config.append(config_id_mapping[tool_name])
         return config
 
     async def _init_conversation(self, model: str, system_prompt: str) -> None:
@@ -113,7 +128,6 @@ class HuggingChat_RE:
 
         url = f"{self.chat_conversation_url}/{self.conversation_id}"
 
-        config = self.config
         request_fields = [
             RequestField(
                 name="data",
@@ -123,8 +137,8 @@ class HuggingChat_RE:
                         "id": self.message_id,
                         "is_retry": False,
                         "is_continue": False,
-                        "web_search": config["websearch"],
-                        "tools": config,
+                        "web_search": self.web_search,
+                        "tools": self.config,
                     },
                     ensure_ascii=False,
                 ),

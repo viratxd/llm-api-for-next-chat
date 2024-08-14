@@ -351,6 +351,14 @@ class ChatGPT_Web_RE:
 
         return formatted_messages
 
+    async def download_image(self, file_id: str) -> dict:
+        url = f"{self.openai_url}/backend-api/files/{file_id}/download"
+        async with AsyncSession() as session:
+            response = await session.get(url, headers=self.headers, impersonate="chrome")
+            download_details = response.json()
+            image = await session.get(download_details["downlad_url"], headers=self.headers, impersonate="chrome")
+        return {"file_name": download_details["file_name"], "image": image.content}
+
     async def conversation(self, model: str, messages: list[Message]) -> Response:
         conversation_url = f"{self.openai_url}/{self.backend_name}/conversation"
 

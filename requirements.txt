@@ -6,7 +6,9 @@
 #
 aiofiles==24.1.0
     # via poe-api-wrapper
-aiohttp==3.9.5
+aiohappyeyeballs==2.3.5
+    # via aiohttp
+aiohttp==3.10.3
     # via g4f
 aiosignal==1.3.1
     # via aiohttp
@@ -17,10 +19,9 @@ anyio==4.4.0
     #   httpx
     #   sse-starlette
     #   starlette
-    #   watchfiles
 appdirs==1.4.4
     # via webscout
-attrs==23.2.0
+attrs==24.2.0
     # via
     #   aiohttp
     #   outcome
@@ -39,13 +40,12 @@ certifi==2024.7.4
     #   httpx
     #   requests
     #   selenium
-cffi==1.16.0
+cffi==1.17.0
     # via curl-cffi
 charset-normalizer==3.3.2
     # via requests
 click==8.1.7
     # via
-    #   typer
     #   uvicorn
     #   webscout
 clipman==3.2.3
@@ -54,29 +54,23 @@ colorama==0.4.6
     # via
     #   halo
     #   log-symbols
-curl-cffi==0.6.4
+curl-cffi==0.7.1
     # via webscout
-dnspython==2.6.1
-    # via email-validator
 docstring-inheritance==2.2.0
     # via webscout
-email-validator==2.2.0
-    # via fastapi
 environs==11.0.0
     # via -r requirements.in
 fake-useragent==1.5.1
     # via -r requirements.in
-fastapi==0.111.0
+fastapi==0.112.0
     # via -r requirements.in
-fastapi-cli==0.0.4
-    # via fastapi
 filelock==3.15.4
     # via tldextract
 frozenlist==1.4.1
     # via
     #   aiohttp
     #   aiosignal
-g4f==0.3.2.0
+g4f==0.3.2.3
     # via webscout
 googlebard1==2.1.4
     # via webscout
@@ -95,11 +89,8 @@ hpack==4.0.0
     # via h2
 httpcore==1.0.5
     # via httpx
-httptools==0.6.1
-    # via uvicorn
 httpx[http2,socks]==0.27.0
     # via
-    #   fastapi
     #   googlebard1
     #   poe-api-wrapper
 hyperframe==6.0.1
@@ -107,26 +98,21 @@ hyperframe==6.0.1
 idna==3.7
     # via
     #   anyio
-    #   email-validator
     #   httpx
     #   requests
     #   tldextract
     #   trio
     #   yarl
-jinja2==3.1.4
-    # via fastapi
 log-symbols==0.0.14
     # via halo
 loguru==0.7.2
     # via poe-api-wrapper
-lxml==5.2.2
+lxml==5.3.0
     # via webscout
 markdown-it-py==2.2.0
     # via rich
-markdownify==0.12.1
+markdownify==0.13.1
     # via webscout
-markupsafe==2.1.5
-    # via jinja2
 marshmallow==3.21.3
     # via environs
 mdurl==0.1.2
@@ -139,9 +125,8 @@ nest-asyncio==1.6.0
     # via
     #   poe-api-wrapper
     #   webscout
-orjson==3.10.5
+orjson==3.10.7
     # via
-    #   fastapi
     #   poe-api-wrapper
     #   webscout
 outcome==1.3.0.post0
@@ -150,11 +135,11 @@ packaging==24.1
     # via
     #   marshmallow
     #   webdriver-manager
-pillow==10.3.0
+pillow==10.4.0
     # via -r requirements.in
 playsound==1.3.0
     # via webscout
-poe-api-wrapper==1.5.9
+poe-api-wrapper==1.6.3
     # via webscout
 prompt-toolkit==3.0.47
     # via googlebard1
@@ -162,34 +147,29 @@ pycparser==2.22
     # via cffi
 pycryptodome==3.20.0
     # via g4f
-pydantic==2.7.4
+pydantic==2.8.2
     # via
     #   -r requirements.in
     #   fastapi
     #   webscout
-pydantic-core==2.18.4
+pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyreqwest-impersonate==0.4.8
+pyreqwest-impersonate==0.5.3
     # via webscout
 pysocks==1.7.1
     # via urllib3
 python-dotenv==1.0.1
     # via
     #   environs
-    #   uvicorn
     #   webdriver-manager
     #   webscout
-python-multipart==0.0.9
-    # via fastapi
-pyyaml==6.0.1
-    # via
-    #   uvicorn
-    #   webscout
+pyyaml==6.0.2
+    # via webscout
 quickjs==1.19.4
     # via poe-api-wrapper
-regex==2024.5.15
+regex==2024.7.24
     # via tiktoken
 requests==2.32.3
     # via
@@ -210,14 +190,11 @@ rich==13.3.4
     # via
     #   googlebard1
     #   poe-api-wrapper
-    #   typer
     #   webscout
-selenium==4.22.0
+selenium==4.23.1
     # via
     #   -r requirements.in
     #   webscout
-shellingham==1.5.4
-    # via typer
 six==1.16.0
     # via
     #   halo
@@ -231,11 +208,11 @@ socksio==1.0.0
     # via httpx
 sortedcontainers==2.4.0
     # via trio
-soupsieve==2.5
+soupsieve==2.6
     # via beautifulsoup4
 spinners==0.0.24
     # via halo
-sse-starlette==2.1.2
+sse-starlette==2.1.3
     # via webscout
 starlette==0.37.2
     # via
@@ -253,40 +230,29 @@ tls-client==1.0.1
     # via
     #   -r requirements.in
     #   webscout
-tqdm==4.66.4
+tqdm==4.66.5
     # via webscout
-trio==0.25.1
+trio==0.26.2
     # via
     #   selenium
     #   trio-websocket
 trio-websocket==0.11.1
     # via selenium
-typer==0.12.3
-    # via fastapi-cli
 typing-extensions==4.12.2
     # via
     #   fastapi
     #   pydantic
     #   pydantic-core
     #   selenium
-    #   typer
-ujson==5.10.0
-    # via fastapi
 urllib3[socks]==2.2.2
     # via
     #   requests
     #   selenium
-uvicorn[standard]==0.30.1
-    # via
-    #   fastapi
-    #   sse-starlette
-uvloop==0.19.0
-    # via uvicorn
-watchfiles==0.22.0
-    # via uvicorn
+uvicorn==0.30.6
+    # via sse-starlette
 wcwidth==0.2.13
     # via prompt-toolkit
-webdriver-manager==4.0.1
+webdriver-manager==4.0.2
     # via
     #   -r requirements.in
     #   webscout
@@ -297,8 +263,6 @@ websocket-client==1.8.0
     #   helpingai-t2
     #   poe-api-wrapper
     #   selenium
-websockets==12.0
-    # via uvicorn
 wsproto==1.2.0
     # via trio-websocket
 yarl==1.9.4

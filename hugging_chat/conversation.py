@@ -14,7 +14,6 @@ class HuggingChat_RE:
     chat_conversation_url = f"{hugging_face_url}/chat/conversation"
     model_key_mapping = {
         "command-r-plus": "CohereForAI/c4ai-command-r-plus",
-        "llama-3.1-405b-instruct": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
         "llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "mixtral-8x7b-instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "mistral-7b-instruct": "mistralai/Mistral-7B-Instruct-v0.3",

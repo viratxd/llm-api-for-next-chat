@@ -167,9 +167,9 @@ async def openai_chat_completions(
                                 accumulated_response_text = message.content.parts[0]
                             elif message.author.role == "tool" and message.content.content_type == "multimodal_text":
                                 # download image to generated_images folder and return markdown image
-                                file_id = message.content.parts[0]["asset_pointer"].split("://")[-1]
+                                file_id = message.content.parts[0].asset_pointer.split("://")[-1]
                                 image_details = await chatgpt_web.download_image(file_id)
-                                file_name = f"{image_details['file_name']}.webp"
+                                file_name = image_details["file_name"]
                                 image_file = Path(f"generated_images/{file_name}")
                                 image_file.parent.mkdir(
                                     parents=True, exist_ok=True, mode=0o777
@@ -247,12 +247,12 @@ async def openai_chat_completions(
                     case "file":
                         # download image to generated_images folder and return markdown image
                         image = await hf_chat.generate_image(data.sha)
-                        file_name = f"{data.sha}.{data.mime}"
+                        file_name = data.name
                         image_file = Path(f"generated_images/{file_name}")
                         image_file.parent.mkdir(parents=True, exist_ok=True, mode=0o777)  # 0o777 is 755 in octal
                         image_file.write_bytes(await image.aread())
                         image_url = f"{API_HOST}/image/{file_name}"
-                        yield_line = f"![{data.name}]({image_url})"
+                        yield_line = f"![{file_name}]({image_url})"
                     case "finalAnswer":
                         yield get_openai_chunk_response_end(model, stream)
                         break

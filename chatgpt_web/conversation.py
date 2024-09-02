@@ -356,8 +356,8 @@ class ChatGPT_Web_RE:
         async with AsyncSession() as session:
             response = await session.get(url, headers=self.headers, impersonate="chrome")
             download_details = response.json()
-            image = await session.get(download_details["downlad_url"], headers=self.headers, impersonate="chrome")
-        return {"file_name": download_details["file_name"], "image": image.content}
+            image = await session.get(download_details["download_url"], impersonate="chrome")
+        return {"file_name": download_details["file_name"].replace("dalle-generations/", ""), "image": image.content}
 
     async def conversation(self, model: str, messages: list[Message]) -> Response:
         conversation_url = f"{self.openai_url}/{self.backend_name}/conversation"

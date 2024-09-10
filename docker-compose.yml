@@ -34,10 +34,12 @@ services:
         gpt-4@OpenAI,\
         gpt-3.5-turbo@OpenAI,\
         gpt-3.5@OpenAI,\
-        gemma-2-9b@Gemma,\
         gemma-2-27b@Gemma,\
-        gemini-1.5-pro-exp-0801@Google,\
+        gemma-2-9b@Gemma,\
+        gemini-1.5-pro-exp-0827@Google,\
         gemini-1.5-pro-latest@Google,\
+        gemini-1.5-flash-exp-0827@Google,\
+        gemini-1.5-flash-8b-exp-0827@Google,\
         gemini-1.5-flash-latest@Google,\
         gemini-1.0-pro-latest@Google,\
         claude-3-5-sonnet-20240620@Anthropic,\

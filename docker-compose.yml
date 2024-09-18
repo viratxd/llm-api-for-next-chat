@@ -28,6 +28,8 @@ services:
       ANTHROPIC_URL: http://llm-api-for-next-chat:5000/api/anthropic
       CUSTOM_MODELS:
         "-all,\
+        o1-preview@OpenAI,\
+        o1-mini@OpenAI,\
         gpt-4o@OpenAI,\
         gpt-4o-mini@OpenAI,\
         gpt-4-turbo@OpenAI,\
@@ -68,7 +70,6 @@ services:
         deepseek-llm-67b@DeepSeek,\
         deepseek-chat@DeepSeek,\
         deepseek-code@DeepSeek,\
-        yi-1.5-34b-chat@01.AI,\
         yi-34b@01.AI,\
         theb-ai@TheB.AI,\
         command-r-plus@CohereForAI,\

@@ -18,7 +18,6 @@ class HuggingChat_RE:
         "mixtral-8x7b-instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "mistral-7b-instruct": "mistralai/Mistral-7B-Instruct-v0.3",
         "nous-hermes-2-mixtral-8x7b-dpo": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "yi-1.5-34b-chat": "01-ai/Yi-1.5-34B-Chat",
         "phi-3-mini-4k-instruct": "microsoft/Phi-3-mini-4k-instruct",
     }
     web_search = False

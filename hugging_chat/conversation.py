@@ -13,12 +13,13 @@ class HuggingChat_RE:
     hugging_face_url = "https://huggingface.co"
     chat_conversation_url = f"{hugging_face_url}/chat/conversation"
     model_key_mapping = {
-        "command-r-plus": "CohereForAI/c4ai-command-r-plus",
         "llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "mixtral-8x7b-instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "mistral-7b-instruct": "mistralai/Mistral-7B-Instruct-v0.3",
-        "nous-hermes-2-mixtral-8x7b-dpo": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "phi-3-mini-4k-instruct": "microsoft/Phi-3-mini-4k-instruct",
+        "command-r-plus-08-2024": "CohereForAI/c4ai-command-r-plus-08-2024",
+        "qwen-2.5-72b-instruct": "Qwen/Qwen2.5-72B-Instruct",
+        "llama-3.2-11b-vision-instruct": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "hermes-3-llama-3.1-8b": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "mistralai-nemo-instruct-2407": "mistralai/Mistral-Nemo-Instruct-2407",
+        "phi-3.5-mini-instruct": "microsoft/Phi-3.5-mini-instruct",
     }
     web_search = False
 

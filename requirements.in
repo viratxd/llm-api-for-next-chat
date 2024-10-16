@@ -1,10 +1,10 @@
-fastapi
+fastapi[standard]
 pydantic>=2.7
 fake-useragent
 requests
 selenium
 webdriver-manager
-webscout
+webscout==3.5
 tls-client
 pillow
 environs

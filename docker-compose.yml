@@ -41,7 +41,7 @@ services:
         gemini-1.5-pro-exp-0827@Google,\
         gemini-1.5-pro-latest@Google,\
         gemini-1.5-flash-exp-0827@Google,\
-        gemini-1.5-flash-8b-exp-0827@Google,\
+        gemini-1.5-flash-8b-exp-0924@Google,\
         gemini-1.5-flash-latest@Google,\
         gemini-1.0-pro-latest@Google,\
         claude-3-5-sonnet-20240620@Anthropic,\

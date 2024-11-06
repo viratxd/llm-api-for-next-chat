@@ -16,6 +16,7 @@ class HuggingChat_RE:
         "llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "command-r-plus-08-2024": "CohereForAI/c4ai-command-r-plus-08-2024",
         "qwen-2.5-72b-instruct": "Qwen/Qwen2.5-72B-Instruct",
+        "llama-3.1-nemotron-70b-instruct": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "llama-3.2-11b-vision-instruct": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "hermes-3-llama-3.1-8b": "NousResearch/Hermes-3-Llama-3.1-8B",
         "mistralai-nemo-instruct-2407": "mistralai/Mistral-Nemo-Instruct-2407",
@@ -91,7 +92,7 @@ class HuggingChat_RE:
         url = f"{self.chat_conversation_url}/{self.conversation_id}/__data.json?x-sveltekit-invalidated=11"
         response = await self.async_client.get(url, headers=self.headers)
         response.raise_for_status()
-        response_json = response.json()
+        response_json = json.loads(response.text.split("\n")[0])
         message_id = response_json["nodes"][1]["data"][3]
         color_print(f"Initialised Message ID: {message_id}", "green")
         return message_id

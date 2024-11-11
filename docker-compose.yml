@@ -69,8 +69,7 @@ services:
         qwen-1.5-14b@Qwen,\
         qwen-1.5-7b@Qwen,\
         deepseek-llm-67b@DeepSeek,\
-        deepseek-chat@DeepSeek,\
-        deepseek-code@DeepSeek,\
+        deepseek-v2.5@DeepSeek,\
         yi-34b@01.AI,\
         theb-ai@TheB.AI,\
         command-r-plus-08-2024@CohereForAI,\

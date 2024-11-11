@@ -265,8 +265,8 @@ async def openai_chat_completions(
 
             await hf_chat.delete_all_conversation()
 
-    elif model in deepseek_web.model_key_mapping:
-        response = await deepseek_web.completions(messages_str, model, comletions_json_data.temperature)
+    elif model in deepseek_web.models:
+        response = await deepseek_web.completions(messages_str)
 
         async def content_generator():
             async for line in response.aiter_lines():

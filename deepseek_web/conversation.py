@@ -9,7 +9,7 @@ class Deepseek_Web_RE:
     base_url = "https://chat.deepseek.com"
     api_prefix = f"{base_url}/api/v0"
     headers = {"User-Agent": get_user_agent()}
-    model_key_mapping = {"deepseek-chat": "deepseek_chat", "deepseek-code": "deepseek_code"}
+    models = ["deepseek-v2.5"]
 
     def __init__(self, async_client: httpx.AsyncClient = None):
         self.async_client = async_client or httpx.AsyncClient()
@@ -29,30 +29,35 @@ class Deepseek_Web_RE:
             response = client.get(url)
             return response.text
 
-    async def _clear_context(self, model_class: str):
-        url = f"{self.api_prefix}/chat/clear_context"
-        payload = {"append_welcome_message": False, "model_class": model_class}
+    async def _get_session_id(self) -> str:
+        url = f"{self.api_prefix}/chat_session/create"
+        payload = {"agent": "chat"}
+        response = await self.async_client.post(url, headers=self.headers, json=payload, timeout=None)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+        return response.json()["data"]["biz_data"]["id"]
+
+    async def _delete_chat_session(self, chat_session_id: str):
+        url = f"{self.api_prefix}/chat_session/delete"
+        payload = {"chat_session_id": chat_session_id}
         response = await self.async_client.post(url, headers=self.headers, json=payload, timeout=None)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
-    async def completions(self, message: str, model: str, temperature: float):
+    async def completions(self, message: str):
         if not self.bearer_token:
             raise HTTPException(status_code=401, detail="Please set the DEEPSEEK_BEARER_TOKEN environment variable")
-        model_class = self.model_key_mapping.get(model, "deepseek_chat")
 
-        await self._clear_context(model_class)
+        url = f"{self.api_prefix}/chat/completion"
+        chat_session_id = await self._get_session_id()
 
-        url = f"{self.api_prefix}/chat/completions"
         payload = {
-            "message": message,
-            "model_class": model_class,
-            "model_preference": None,
-            "stream": True,
-            "temperature": temperature,
+            "chat_session_id": chat_session_id,
+            "parent_message_id": None,
+            "prompt": message,
+            "ref_file_ids": [],
         }
-        json_payload = json.dumps(payload, ensure_ascii=False)
-        req = self.async_client.build_request("POST", url, headers=self.headers, data=json_payload, timeout=None)
+        req = self.async_client.build_request("POST", url, headers=self.headers, json=payload, timeout=None)
         response = await self.async_client.send(req, stream=True)
 
         color_print(f"Deepseek Web Response Status Code: {response.status_code}", "blue")
@@ -61,4 +66,5 @@ class Deepseek_Web_RE:
             error_json = json.loads(await response.aread())
             raise HTTPException(status_code=400, detail=error_json)
 
+        await self._delete_chat_session(chat_session_id)
         return response

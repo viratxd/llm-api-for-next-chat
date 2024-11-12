@@ -114,7 +114,9 @@ async def anthropic_messages(message_json_data: MessageJsonData, background_task
 
 @app.post("/api/openai/v1/chat/completions")
 async def openai_chat_completions(
-    comletions_json_data: CompletionsJsonData, background_tasks: BackgroundTasks, authorization: str = Header("")
+    comletions_json_data: CompletionsJsonData,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(env("OPENAI_API_KEY")),
 ):
     model = comletions_json_data.model
     stream = comletions_json_data.stream
@@ -136,7 +138,13 @@ async def openai_chat_completions(
             )
             resp = await async_client.send(req, stream=True)
             background_tasks.add_task(resp.aclose)
-            return StreamingResponse(resp.aiter_raw(), status_code=resp.status_code, headers=response_headers)
+            return (
+                StreamingResponse(resp.aiter_raw(), status_code=resp.status_code, headers=response_headers)
+                if stream
+                else JSONResponse(
+                    json.loads(await resp.aread()), status_code=resp.status_code, headers=response_headers
+                )
+            )
         else:
             response = await chatgpt_web.conversation(model, comletions_json_data.messages)
 

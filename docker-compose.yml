@@ -32,9 +32,7 @@ services:
         o1-mini@OpenAI,\
         gpt-4o@OpenAI,\
         gpt-4o-mini@OpenAI,\
-        gpt-4-turbo@OpenAI,\
         gpt-4@OpenAI,\
-        gpt-3.5-turbo@OpenAI,\
         gpt-3.5@OpenAI,\
         gemma-2-27b@Gemma,\
         gemma-2-9b@Gemma,\

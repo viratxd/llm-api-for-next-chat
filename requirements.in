@@ -5,6 +5,7 @@ requests
 selenium
 webdriver-manager
 webscout==3.5
+aiohttp>=3.10.11
 tls-client
 pillow
 environs

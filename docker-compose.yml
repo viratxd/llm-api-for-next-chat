@@ -36,12 +36,11 @@ services:
         gpt-3.5@OpenAI,\
         gemma-2-27b@Gemma,\
         gemma-2-9b@Gemma,\
-        gemini-1.5-pro-exp-0827@Google,\
+        learnlm-1.5-pro-experimental@Google,\
+        gemini-exp-1121@Google,\
         gemini-1.5-pro-latest@Google,\
-        gemini-1.5-flash-exp-0827@Google,\
-        gemini-1.5-flash-8b-exp-0924@Google,\
         gemini-1.5-flash-latest@Google,\
-        gemini-1.0-pro-latest@Google,\
+        gemini-1.5-flash-8b-latest@Google,\
         claude-3-5-sonnet-20240620@Anthropic,\
         claude-3-opus-20240229@Anthropic,\
         claude-3-sonnet-20240229@Anthropic,\

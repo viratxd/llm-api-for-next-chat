@@ -3,25 +3,16 @@ import random
 import string
 import httpx
 import os
+import yaml
 from fastapi import HTTPException
 from urllib3 import encode_multipart_formdata
 from urllib3.fields import RequestField
-from utility import color_print, get_user_agent
+from utility import color_print, get_user_agent, update_nextchat_custom_models
 
 
 class HuggingChat_RE:
     hugging_face_url = "https://huggingface.co"
     chat_conversation_url = f"{hugging_face_url}/chat/conversation"
-    model_key_mapping = {
-        "llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "command-r-plus-08-2024": "CohereForAI/c4ai-command-r-plus-08-2024",
-        "qwen-2.5-72b-instruct": "Qwen/Qwen2.5-72B-Instruct",
-        "llama-3.1-nemotron-70b-instruct": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "llama-3.2-11b-vision-instruct": "meta-llama/Llama-3.2-11B-Vision-Instruct",
-        "hermes-3-llama-3.1-8b": "NousResearch/Hermes-3-Llama-3.1-8B",
-        "mistralai-nemo-instruct-2407": "mistralai/Mistral-Nemo-Instruct-2407",
-        "phi-3.5-mini-instruct": "microsoft/Phi-3.5-mini-instruct",
-    }
     web_search = False
 
     def __init__(self, async_client: httpx.AsyncClient = None) -> None:
@@ -33,6 +24,7 @@ class HuggingChat_RE:
         self.async_client = async_client or httpx.AsyncClient()
         self.conversation_id = None
         self.message_id = None
+        self.model_key_mapping = self._get_latest_models()
 
     @property
     def hf_chat(self) -> str:
@@ -61,6 +53,33 @@ class HuggingChat_RE:
                 if is_enabled:
                     config.append(config_id_mapping[tool_name])
         return config
+
+    def _get_latest_models(self) -> dict:
+        url = "https://raw.githubusercontent.com/huggingface/chat-ui/refs/heads/main/chart/env/prod.yaml"
+        response = httpx.get(url)
+        response.raise_for_status()
+        yaml_data = yaml.safe_load(response.text)
+        models_string = yaml_data["envVars"]["MODELS"]
+        models_list = yaml.safe_load(models_string)
+        model_key_mapping = {}
+        for model in models_list:
+            if model.get("description"):
+                model_name = model["name"]
+                key = model_name.split("/")[-1].lower()
+                model_key_mapping[key] = model_name
+
+        existing_models_file = "hugging_chat/models.json"
+        with open(existing_models_file, "r") as file:
+            existing_models = json.load(file)
+
+        models_to_remove = set()
+        if existing_models != model_key_mapping:
+            models_to_remove = set(existing_models.keys()) - set(model_key_mapping.keys())
+            with open(existing_models_file, "w") as file:
+                json.dump(model_key_mapping, file, indent=4)
+
+        update_nextchat_custom_models(model_key_mapping.keys(), models_to_remove)
+        return model_key_mapping
 
     async def _init_conversation(self, model: str, system_prompt: str) -> None:
         max_retries = 3
@@ -115,14 +134,14 @@ class HuggingChat_RE:
     async def request_conversation(
         self,
         query: str,
-        model: str = "yi-1.5-34b-chat",
+        model: str,
         system_prompt: str = "Act as an AI assistant that responds to user inputs in the language they use. Parse the provided JSON-formatted conversation history, but respond only to the final user message without referencing the JSON format. Maintain consistency with previous responses and adapt to the user's language preference.",
     ):
         if not self.hf_chat:
             raise HTTPException(status_code=400, detail="Please set the HUGGING_CHAT_TOKEN environment variable.")
 
         await self._init_conversation(
-            model=self.model_key_mapping.get(model, "01-ai/Yi-1.5-34B-Chat"),
+            model=self.model_key_mapping.get(model),
             system_prompt=system_prompt,
         )
 

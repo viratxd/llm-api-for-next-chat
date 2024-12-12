@@ -12,6 +12,8 @@ services:
       - ./hugging_chat/config.json:/app/hugging_chat/config.json
       - ./generated_images:/app/generated_images
       - .env:/app/.env
+      - ./docker-compose.yml:/app/docker-compose.yml
+      - ./scripts:/app/scripts
     networks:
       - llms_api
 
@@ -19,15 +21,12 @@ services:
     image: yidadaa/chatgpt-next-web
     container_name: chatgpt-next-web
     restart: unless-stopped
-    depends_on:
-      - llm-api-for-next-chat
     ports:
       - 3030:3000
     environment:
       BASE_URL: http://llm-api-for-next-chat:5000/api/openai
       ANTHROPIC_URL: http://llm-api-for-next-chat:5000/api/anthropic
-      CUSTOM_MODELS:
-        "-all,\
+      CUSTOM_MODELS: "-all,\
         o1-preview@OpenAI,\
         o1-mini@OpenAI,\
         gpt-4o@OpenAI,\
@@ -45,20 +44,16 @@ services:
         claude-3-opus-20240229@Anthropic,\
         claude-3-sonnet-20240229@Anthropic,\
         claude-3-haiku-20240307@Anthropic,\
-        llama-3.2-11b-vision-instruct@Meta,\
         llama-3.1-405b@Meta,\
-        llama-3.1-70b-instruct@Meta,\
-        llama-3.1-nemotron-70b-instruct@Nvidia,\
         llama-3.1-70b@Meta,\
         llama-3.1-8b@Meta,\
         llama-3-70b@Meta,\
         llama-3-8b@Meta,\
-        mixtral-8x22b@Mistral,\
-        mixtral-8x7b@Mistral,\
-        mistral-7b@Mistral,\
+        mixtral-8x22b@MistralAI,\
+        mixtral-8x7b@MistralAI,\
+        mistral-7b@MistralAI,\
         wizardlm-2-8x22b@WizardLM,\
         dbrx-instruct@Databricks,\
-        qwen-2.5-72b-instruct@Qwen,\
         qwen-2-72b@Qwen,\
         qwen-1.5-110b@Qwen,\
         qwen-1.5-72b@Qwen,\
@@ -69,14 +64,33 @@ services:
         deepseek-v2.5@DeepSeek,\
         yi-34b@01.AI,\
         theb-ai@TheB.AI,\
-        command-r-plus-08-2024@CohereForAI,\
-        hermes-3-llama-3.1-8b@NousResearch,\
+        qwen2.5-72b-instruct@Qwen,\
+        llama-3.3-70b-instruct@Meta,\
+        c4ai-command-r-plus-08-2024@CohereForAI,\
+        qwq-32b-preview@Qwen,\
+        llama-3.1-nemotron-70b-instruct-hf@Meta,\
+        qwen2.5-coder-32b-instruct@Qwen,\
+        llama-3.2-11b-vision-instruct@Meta,\
+        hermes-3-llama-3.1-8b@Meta,\
+        mistral-nemo-instruct-2407@MistralAI,\
         phi-3.5-mini-instruct@Microsoft"
     env_file:
       - .env
     networks:
       - llms_api
 
+  monitor:
+    image: docker:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/app/docker-compose.yml
+      - .env:/app/.env
+      - ./scripts:/app/scripts
+    command: sh -c "chmod +x /app/scripts/monitor.sh && /app/scripts/monitor.sh"
+    depends_on:
+      - llm-api-for-next-chat
+    networks:
+      - llms_api
 
 networks:
   llms_api:

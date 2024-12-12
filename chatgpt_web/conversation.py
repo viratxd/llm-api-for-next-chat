@@ -16,6 +16,7 @@ from curl_cffi import requests
 from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.models import Response
 from PIL import Image
+from distutils.util import strtobool
 
 
 class ChatGPT_Web_RE:
@@ -60,7 +61,7 @@ class ChatGPT_Web_RE:
         return "Unknown error occurred."
 
     def _set_access_token(self) -> None:
-        if not self.is_anonymous:
+        if not self.is_anonymous and strtobool(os.environ.get("USE_CHATGPT_WEB", "false").lower()):
             self.cookies["__Secure-next-auth.session-token"] = os.environ["CHATGPT_WEB_SESSION_TOKEN"]
             auth_url = f"{self.openai_url}/api/auth/session"
             response = requests.get(auth_url, headers=self.headers, cookies=self.cookies, impersonate="chrome")

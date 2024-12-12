@@ -86,12 +86,21 @@ class TheB_AI_RE:
     async def _check_balance(self) -> float:
         url = f"{self.theb_ai_api_url}/organization/balance?org_id={self.organization_id}"
         response = await self.async_client.get(url, headers=self.headers)
-        response.raise_for_status()
-        response_json = response.json()
-        balance = float(response_json["data"]["balance"])
-        color_print(f"Current Balance: {balance}", "blue")
-        if balance <= 0.0:
-            color_print("Blance out of funds. Changing API token.", "yellow")
+        balance = 0.0
+        need_change_api_key = False
+        if response.status_code == 401:
+            color_print("Blance check unauthorized. Changing API token.", "yellow")
+            need_change_api_key = True
+        elif response.status_code == 200:
+            response_json = response.json()
+            balance = float(response_json["data"]["balance"])
+            color_print(f"Current Balance: {balance}", "blue")
+            if balance <= 0.0:
+                color_print("Blance out of funds. Changing API token.", "yellow")
+                need_change_api_key = True
+        else:
+            response.raise_for_status()
+        if need_change_api_key:
             self._remove_apis()
             self.api_info = self._load_api_info()
             self._init_api_info()
@@ -120,12 +129,13 @@ class TheB_AI_RE:
         conversation_url = (
             f"{self.theb_ai_api_url}/conversation?org_id={self.organization_id}&req_rand={random.random()}"
         )
+        # Default to Llama 3 8B
+        model = chat_models.get(model, "c60d009ce85f47f087952f17eead4eab")
         request_payload = {
             "text": text,
-            # Default to Llama 3 8B
-            "model": chat_models.get(model, "c60d009ce85f47f087952f17eead4eab"),
+            "model": model,
             "functions": [],
-            "attachments": [],
+            "attachments": None,
             "model_params": {
                 "system_prompt": "Act as an AI assistant that responds to user inputs in the language they use. Parse the provided JSON-formatted conversation history, but respond only to the final user message without referencing the JSON format. Maintain consistency with previous responses and adapt to the user's language preference.",
                 "temperature": temperature,
@@ -136,6 +146,8 @@ class TheB_AI_RE:
             },
         }
         json_payload = json.dumps(request_payload, ensure_ascii=False)
+
+        self.headers["x-ai-model"] = model  # avoid 403 cf security check
         req = self.async_client.build_request(
             "POST", conversation_url, headers=self.headers, data=json_payload, timeout=None
         )
@@ -156,6 +168,5 @@ class TheB_AI_RE:
                 await self._select_target_balance_account(required_min_balance)
                 return await self.conversation(model, text, temperature, top_p)
             except Exception as e:
-                color_print(f"{detail=}", "red")
                 raise HTTPException(status_code=400, detail=str(e))
         return response

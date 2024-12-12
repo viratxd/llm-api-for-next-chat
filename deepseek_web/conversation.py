@@ -52,10 +52,13 @@ class Deepseek_Web_RE:
         chat_session_id = await self._get_session_id()
 
         payload = {
+            "challenge_response": None,
             "chat_session_id": chat_session_id,
             "parent_message_id": None,
             "prompt": message,
             "ref_file_ids": [],
+            "search_enabled": False,
+            "thinking_enabled": False,
         }
         req = self.async_client.build_request("POST", url, headers=self.headers, json=payload, timeout=None)
         response = await self.async_client.send(req, stream=True)

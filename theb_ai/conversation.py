@@ -1,8 +1,9 @@
 import httpx
 import json
 import random
+import asyncio
 from fastapi import HTTPException
-from .Theb_AI_Login import Theb_API_JSON_PATH, start_async_tasks as generate_api_token
+from .register import TheB_AI_Register, async_generate_api_token
 from utility import color_print, get_user_agent
 
 
@@ -45,12 +46,12 @@ class TheB_AI_RE:
 
     def _load_api_info(self) -> list[dict]:
         try:
-            with open(Theb_API_JSON_PATH, "r") as file:
+            with open(TheB_AI_Register.api_json_path, "r") as file:
                 api_info = json.load(file)
             if len(api_info) == 0:
                 raise Exception()
         except Exception:
-            generate_api_token()
+            asyncio.run(async_generate_api_token())
             return self._load_api_info()
         else:
             return api_info
@@ -63,11 +64,11 @@ class TheB_AI_RE:
         }
 
     def _remove_apis(self) -> None:
-        with open(Theb_API_JSON_PATH, "r") as file:
+        with open(TheB_AI_Register.api_json_path, "r") as file:
             data = json.load(file)
         if data:
             data.pop(0)
-        with open(Theb_API_JSON_PATH, "w") as file:
+        with open(TheB_AI_Register.api_json_path, "w") as file:
             json.dump(data, file, indent=4)
 
     async def _init_chat_models(self) -> dict[str, str]:
@@ -115,7 +116,7 @@ class TheB_AI_RE:
         # all accounts are not enough balance, generate new and choose the new one
         else:
             color_print("All accounts are not enough balance, generating new API token.", "yellow")
-            generate_api_token()
+            await async_generate_api_token()
             self.api_info = self._load_api_info()
             self.api_info.reverse()
             self._init_api_info()

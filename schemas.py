@@ -32,8 +32,8 @@ class OpenAI_ImageURL(BaseModel):
 
 class Content(BaseModel):
     text: str = None
-    source: Claude_ImageSource = None
-    image_url: OpenAI_ImageURL = None
+    source: Claude_ImageSource = ""
+    image_url: OpenAI_ImageURL = ""
     type: str
 
 

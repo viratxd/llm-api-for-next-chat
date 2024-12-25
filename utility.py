@@ -13,9 +13,12 @@ def color_print(text: str, color: Literal["red", "green", "yellow", "blue"]):
     print(f"{colors[color]}{text}\033[0m")
 
 
-def get_user_agent() -> str:
+def get_user_agent(browser: str = None) -> str:
     ua = UserAgent()
-    return ua.random
+    try:
+        return ua.random if not browser else getattr(ua, browser)
+    except Exception:
+        return ua.random
 
 
 def get_response_headers(stream: bool):

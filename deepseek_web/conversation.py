@@ -1,7 +1,8 @@
 import json
-import httpx
 import os
 from fastapi import HTTPException
+from curl_cffi import requests
+from curl_cffi.requests import AsyncSession
 from utility import color_print, get_user_agent
 
 
@@ -11,12 +12,12 @@ class Deepseek_Web_RE:
     headers = {"User-Agent": get_user_agent()}
     models = ["deepseek-v2.5"]
 
-    def __init__(self, async_client: httpx.AsyncClient = None):
-        self.async_client = async_client or httpx.AsyncClient()
+    def __init__(self):
         self.headers = self.headers | {
             "Authorization": f"Bearer {self.bearer_token}",
             "X-App-Version": self.app_version,
         }
+        self.async_session = AsyncSession(headers=self.headers, impersonate="chrome", timeout=None)
 
     @property
     def bearer_token(self) -> str:
@@ -25,24 +26,23 @@ class Deepseek_Web_RE:
     @property
     def app_version(self) -> str:
         url = f"{self.base_url}/version.txt"
-        with httpx.Client() as client:
-            response = client.get(url)
-            return response.text
+        response = requests.get(url, headers=self.headers)
+        return response.text
 
     async def _get_session_id(self) -> str:
         url = f"{self.api_prefix}/chat_session/create"
         payload = {"agent": "chat"}
-        response = await self.async_client.post(url, headers=self.headers, json=payload, timeout=None)
+        response = await self.async_session.post(url, json=payload)
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            raise HTTPException(status_code=response.status_code, detail=await response.atext())
         return response.json()["data"]["biz_data"]["id"]
 
     async def _delete_chat_session(self, chat_session_id: str):
         url = f"{self.api_prefix}/chat_session/delete"
         payload = {"chat_session_id": chat_session_id}
-        response = await self.async_client.post(url, headers=self.headers, json=payload, timeout=None)
+        response = await self.async_session.post(url, json=payload)
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            raise HTTPException(status_code=response.status_code, detail=await response.atext())
 
     async def completions(self, message: str):
         if not self.bearer_token:
@@ -60,13 +60,12 @@ class Deepseek_Web_RE:
             "search_enabled": False,
             "thinking_enabled": False,
         }
-        req = self.async_client.build_request("POST", url, headers=self.headers, json=payload, timeout=None)
-        response = await self.async_client.send(req, stream=True)
+        response = await self.async_session.post(url, json=payload, stream=True)
 
         color_print(f"Deepseek Web Response Status Code: {response.status_code}", "blue")
         # error will still return 200 status code, but only json format
         if response.headers.get("content-type") == "application/json":
-            error_json = json.loads(await response.aread())
+            error_json = json.loads(await response.atext())
             raise HTTPException(status_code=400, detail=error_json)
 
         await self._delete_chat_session(chat_session_id)

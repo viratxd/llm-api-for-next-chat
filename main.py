@@ -40,7 +40,7 @@ async_client = httpx.AsyncClient()
 theb_ai = TheB_AI_RE(async_client)
 hf_chat = HuggingChat_RE(async_client)
 chatgpt_web = ChatGPT_Web_RE()
-deepseek_web = Deepseek_Web_RE(async_client)
+deepseek_web = Deepseek_Web_RE()
 
 
 @asynccontextmanager
@@ -279,7 +279,7 @@ async def openai_chat_completions(
         async def content_generator():
             async for line in response.aiter_lines():
                 if stream:
-                    yield line.encode() + b"\n"
+                    yield line.decode("utf-8") + "\n"
                 else:
                     if line:
                         line_content = re.sub("^data: ", "", line)

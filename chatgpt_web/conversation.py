@@ -403,6 +403,7 @@ class ChatGPT_Web_RE:
                 self.proof_token = None
                 response = await self.conversation(model, messages)
             else:
+                self.max_retries = 3  # reset max_retries
                 raise HTTPException(status_code=400, detail="Maximum retries reached. Please try again later.")
         elif response.status_code != 200:
             raise HTTPException(

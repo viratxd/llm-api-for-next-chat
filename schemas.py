@@ -56,9 +56,12 @@ class ChatGPT_WebContent(BaseModel):
 
 class Message(BaseModel):
     role: str = None
-    content: str | list[Content] | ChatGPT_WebContent
+    content: Optional[str | list[Content] | ChatGPT_WebContent] = None
     author: Optional[Author] = None
     status: Optional[str] = None
+    tool_calls: Optional[list] = None
+    name: Optional[str] = None
+    tool_call_id: Optional[str] = None
 
 
 class MessageJsonData(BaseModel):
@@ -71,6 +74,11 @@ class MessageJsonData(BaseModel):
     top_p: int
 
 
+class Tool(BaseModel):
+    type: str = "function"
+    function: dict
+
+
 class CompletionsJsonData(BaseModel):
     frequency_penalty: float = 0
     messages: list[Message]
@@ -78,6 +86,7 @@ class CompletionsJsonData(BaseModel):
     presence_penalty: float = 0
     stream: bool
     temperature: float
+    tools: Optional[list[Tool]] = None
     top_p: int
 
 

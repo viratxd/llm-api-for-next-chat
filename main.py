@@ -125,7 +125,7 @@ async def openai_chat_completions(
         [jsonable_encoder(message, exclude_unset=True) for message in comletions_json_data.messages], ensure_ascii=False
     )
 
-    if model.startswith("gpt") or model.startswith("o1"):
+    if model.startswith("gpt") or model.startswith("o1") or model.startswith("o3"):
         if not env.bool("USE_CHATGPT_WEB", True):
             # reverse to openai completions
             openai_api = env("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
@@ -133,7 +133,7 @@ async def openai_chat_completions(
                 "POST",
                 openai_api,
                 headers={"Authorization": authorization},
-                json=comletions_json_data.model_dump(),
+                json=comletions_json_data.model_dump(exclude_unset=True),
                 timeout=None,
             )
             resp = await async_client.send(req, stream=True)

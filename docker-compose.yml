@@ -27,6 +27,7 @@ services:
       BASE_URL: http://llm-api-for-next-chat:5000/api/openai
       ANTHROPIC_URL: http://llm-api-for-next-chat:5000/api/anthropic
       CUSTOM_MODELS: "-all,\
+        o3-mini@OpenAI,\
         o1-preview@OpenAI,\
         o1-mini@OpenAI,\
         gpt-4o@OpenAI,\
@@ -63,7 +64,7 @@ services:
         qwen-1.5-14b@Qwen,\
         qwen-1.5-7b@Qwen,\
         deepseek-llm-67b@DeepSeek,\
-        deepseek-v2.5@DeepSeek,\
+        deepseek-chat@DeepSeek,\
         yi-34b@01.AI,\
         theb-ai@TheB.AI,\
         qwen2.5-72b-instruct@Qwen,\
@@ -75,7 +76,8 @@ services:
         llama-3.2-11b-vision-instruct@Meta,\
         hermes-3-llama-3.1-8b@Meta,\
         mistral-nemo-instruct-2407@MistralAI,\
-        phi-3.5-mini-instruct@Microsoft"
+        phi-3.5-mini-instruct@Microsoft,\
+        deepseek-r1-distill-qwen-32b@Qwen"
     env_file:
       - .env
     networks:

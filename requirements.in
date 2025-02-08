@@ -10,3 +10,5 @@ ruamel.yaml
 seleniumbase
 python3-xlib
 pyautogui
+numpy
+wasmtime

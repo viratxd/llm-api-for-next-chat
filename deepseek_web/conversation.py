@@ -38,14 +38,13 @@ class Deepseek_Web_RE:
 
     def _init_cf_challenge_cookies(self):
         with SB(uc=True, headed=True, xvfb=True) as sb:
-            sb.uc_open_with_reconnect(self.base_url, 4)
+            sb.uc_open_with_reconnect(self.base_url, 2)
             sb.uc_gui_click_captcha()
             sb.activate_cdp_mode(self.base_url)
             cookies = {cookie.name: cookie.value for cookie in sb.cdp.get_all_cookies()}
             self.user_agent = sb.get_user_agent()
         if "cf_clearance" not in cookies:
-            color_print("Failed to solve the Cloudflare challenge. Retrying...", "red")
-            return self._init_cf_challenge_cookies()
+            color_print("Failed to solve the Cloudflare challenge", "yellow")
         self.cf_challenge_cookies = cookies
 
     async def _create_pow_challenge(self) -> dict:
@@ -53,7 +52,7 @@ class Deepseek_Web_RE:
         payload = {"target_path": "/api/v0/chat/completion"}
         response = await self.async_session.post(url, json=payload)
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=await response.atext)
+            raise HTTPException(status_code=response.status_code, detail=response.text)
         return response.json()["data"]["biz_data"]["challenge"]
 
     async def _get_ds_pow(self) -> str:
@@ -79,10 +78,10 @@ class Deepseek_Web_RE:
         payload = {"character_id": None}
         response = await self.async_session.post(url, json=payload)
         if response.status_code == 403:
-            self._init_cf_challenge_cookies()
+            self.__init__()
             raise HTTPException(status_code=403, detail="Cloudflare challenge expired, please retry")
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=await response.atext)
+            raise HTTPException(status_code=response.status_code, detail=response.text)
         return response.json()["data"]["biz_data"]["id"]
 
     async def _delete_chat_session(self, chat_session_id: str):
@@ -90,7 +89,7 @@ class Deepseek_Web_RE:
         payload = {"chat_session_id": chat_session_id}
         response = await self.async_session.post(url, json=payload)
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=await response.atext)
+            raise HTTPException(status_code=response.status_code, detail=response.text)
 
     async def completions(self, message: str):
         if not self.bearer_token:

@@ -117,9 +117,9 @@ class HuggingChat_RE:
         return message_id
 
     async def delete_all_conversation(self) -> None:
-        delete_url = f"{self.chat_conversation_url}s?/delete"
+        delete_url = f"{self.hugging_face_url}/chat/api/conversations"
         headers = self.headers | {"Content-Type": f"multipart/form-data; boundary={self.generate_random_boundary()}"}
-        response = await self.async_client.post(delete_url, headers=headers)
+        response = await self.async_client.delete(delete_url, headers=headers)
         response.raise_for_status()
         color_print("All conversation deleted.", "green")
 

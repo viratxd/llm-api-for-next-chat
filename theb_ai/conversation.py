@@ -10,11 +10,13 @@ from utility import color_print, get_user_agent
 class TheB_AI_RE:
     theb_ai_api_url = "https://beta.theb.ai/api"
     model_key_mapping = {
+        "TheB.AI 4.0": "theb-ai-4.0",
         "TheB.AI": "theb-ai",
-        "Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620",
-        "Claude 3 Opus": "claude-3-opus-20240229",
-        "Claude 3 Sonnet": "claude-3-sonnet-20240229",
-        "Claude 3 Haiku": "claude-3-haiku-20240307",
+        "Claude 3.7 Sonnet": "claude-3-7-sonnet",
+        "Claude 3.7 Sonnet Thinking": "claude-3-7-sonnet-thinking",
+        "Claude 3.5 Sonnet": "claude-3-5-sonnet",
+        "Claude 3 Opus": "claude-3-opus",
+        "Claude 3 Sonnet": "claude-3-sonnet",
         "Llama 3.1 405B": "llama-3.1-405b",
         "Llama 3.1 70B": "llama-3.1-70b",
         "Llama 3.1 8B": "llama-3.1-8b",
@@ -31,7 +33,6 @@ class TheB_AI_RE:
         "Qwen 1.5 32B": "qwen-1.5-32b",
         "Qwen 1.5 14B": "qwen-1.5-14b",
         "Qwen 1.5 7B": "qwen-1.5-7b",
-        "Deepseek LLM 67B": "deepseek-llm-67b",
         "Yi 34B": "yi-34b",
         "Gemma 2 27B": "gemma-2-27b",
         "Gemma 2 9B": "gemma-2-9b",

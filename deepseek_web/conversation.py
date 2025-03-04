@@ -38,7 +38,6 @@ class Deepseek_Web_RE:
 
     def _init_cf_challenge_cookies(self):
         with SB(uc=True, headed=True, xvfb=True) as sb:
-            sb.uc_open_with_reconnect(self.base_url, 2)
             sb.uc_gui_click_captcha()
             sb.activate_cdp_mode(self.base_url)
             cookies = {cookie.name: cookie.value for cookie in sb.cdp.get_all_cookies()}

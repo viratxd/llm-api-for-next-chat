@@ -62,15 +62,13 @@ class TheB_AI_Register:
 
         with SB(uc=True, locale_code="en", headed=True, xvfb=self.headless) as sb:
             url = "https://beta.theb.ai/register"
-            sb.uc_open_with_reconnect(url, 4)
-            print(f"Registering page title: {sb.get_page_title()}")
+            sb.uc_open_with_reconnect(url, 2)
             sb.uc_gui_click_captcha()
-            sb.activate_cdp_mode(url)
             sb.sleep(randint(2, 3))
-            sb.cdp.type('input[placeholder="Name"]', self.full_name)
-            sb.cdp.type('input[placeholder="Email"]', email)
-            sb.cdp.type('input[placeholder="Password"]', self.password)
-            sb.cdp.click('button[type="button"]:contains("Create Account")')
+            sb.type('input[placeholder="Name"]', self.full_name)
+            sb.type('input[placeholder="Email"]', email)
+            sb.type('input[placeholder="Password"]', self.password)
+            sb.click('button[type="button"]:contains("Create Account")')
             sb.sleep(randint(1, 2))
             if sb.is_text_visible("An error occurred during registration."):
                 raise Exception("Failed to register")

@@ -7,24 +7,53 @@ from curl_cffi.requests import AsyncSession
 from seleniumbase import SB
 from utility import color_print
 from .ds_wasm_pow import DS_WasmPow
-
+from multiprocessing import Process, Queue
 
 class Deepseek_Web_RE:
     base_url = "https://chat.deepseek.com"
     api_prefix = f"{base_url}/api/v0"
     models = ["deepseek-chat"]
 
-    def __init__(self):
-        self._init_cf_challenge_cookies()
+    def __init__(self, cookies: dict, user_agent: str):
+        self.cf_challenge_cookies = cookies
+        self.user_agent = user_agent
         self.headers = {
             "user-agent": self.user_agent,
-            "authorization": f"Bearer {self.bearer_token}",
+            "authorization": f"Bearer +mzX6SY48LgKHayFNCxQAfarRe8xqVKKxvfqKwi+oNheHF7fJAHGuen5qayACntq",
             "x-app-version": self.app_version,
         }
         self.async_session = AsyncSession(
-            headers=self.headers, impersonate="chrome", timeout=None, cookies=self.cf_challenge_cookies
+            headers=self.headers, 
+            impersonate="chrome", 
+            timeout=None, 
+            cookies=self.cf_challenge_cookies
         )
         self.ds_wasm_pow = DS_WasmPow("deepseek_web/sha3_wasm_bg.7b9ca65ddd.wasm")
+
+    @staticmethod
+    def _get_cf_challenge(queue: Queue, base_url: str):
+        """Run in separate process to isolate event loops"""
+        with SB(uc=True, headed=True, xvfb=True) as sb:
+            sb.uc_gui_click_captcha()
+            sb.activate_cdp_mode(base_url)  # Use the passed base_url
+            cookies = {cookie.name: cookie.value for cookie in sb.cdp.get_all_cookies()}
+            user_agent = sb.get_user_agent()
+            queue.put((cookies, user_agent))
+
+    @classmethod
+    def create(cls):
+        """Factory method to handle CF challenge in isolated process"""
+        queue = Queue()
+        p = Process(target=cls._get_cf_challenge, args=(queue, cls.base_url))  # Pass base_url
+        p.start()
+        p.join()
+        
+        cookies, user_agent = queue.get()
+        if "cf_clearance" not in cookies:
+            color_print("Failed to solve the Cloudflare challenge", "yellow")
+            raise RuntimeError("Cloudflare challenge failed")
+            
+        return cls(cookies, user_agent)
 
     @property
     def bearer_token(self) -> str:
@@ -35,16 +64,6 @@ class Deepseek_Web_RE:
         url = f"{self.base_url}/version.txt"
         response = requests.get(url, headers={"user-agent": self.user_agent}, cookies=self.cf_challenge_cookies)
         return response.text
-
-    def _init_cf_challenge_cookies(self):
-        with SB(uc=True, headed=True, xvfb=True) as sb:
-            sb.uc_gui_click_captcha()
-            sb.activate_cdp_mode(self.base_url)
-            cookies = {cookie.name: cookie.value for cookie in sb.cdp.get_all_cookies()}
-            self.user_agent = sb.get_user_agent()
-        if "cf_clearance" not in cookies:
-            color_print("Failed to solve the Cloudflare challenge", "yellow")
-        self.cf_challenge_cookies = cookies
 
     async def _create_pow_challenge(self) -> dict:
         url = f"{self.api_prefix}/chat/create_pow_challenge"
